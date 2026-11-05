@@ -4,8 +4,7 @@ name: azure-functions-book
 
 on:
   push:
-    branches: [main, 'book/**']
-    paths-ignore: ['book/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
