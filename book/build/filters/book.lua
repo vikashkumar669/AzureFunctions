@@ -118,8 +118,18 @@ local function code_block(cb)
       -- No region: the whole file (used for JSON, which has no comments).
       local file = io.open(code_root .. "/" .. include, "r")
       if not file then error("Listing file not found: " .. include) end
-      cb.text = file:read("a"):gsub("\n+$", "")
+      local whole = file:read("a"):gsub("\n+$", "")
       file:close()
+      -- Whole files (Appendix L): drop listing-region markers and
+      -- callout markers, which only make sense next to a chapter's notes.
+      local kept = {}
+      for line in (whole .. "\n"):gmatch("([^\n]*)\n") do
+        if not line:find("</?listing:") then
+          line = line:gsub("%s*//%s*<%d>", "")
+          table.insert(kept, line)
+        end
+      end
+      cb.text = table.concat(kept, "\n")
     end
     cb.attributes["include"] = nil
     cb.attributes["region"] = nil

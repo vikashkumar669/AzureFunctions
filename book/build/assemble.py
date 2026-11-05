@@ -81,7 +81,7 @@ def cover():
   <div class="cover-foot">
     <p class="cover-tag">{TAGLINE}</p>
     <div class="cover-row"><p class="cover-author">{AUTHOR}</p>
-    <p class="cover-count">25 chapters · 4 capstone projects</p></div>
+    <p class="cover-count">25 chapters · 25 guided labs · 4 capstones</p></div>
   </div>
 </section>"""
 
@@ -100,7 +100,7 @@ def title_and_copyright():
   book's text or figures may be reproduced without the author's written
   permission, except for brief quotations in reviews. The companion source
   code is licensed separately under the MIT licence.</p>
-  <p>Self-published by the author. First edition, October 2026.</p>
+  <p>Self-published by Vikash Kumar. First edition, November 2026.</p>
   <p><strong>Trademarks.</strong> Microsoft, Azure, Dynamics 365, Power
   Platform, Power Apps, Power Automate, Power Pages, Dataverse, Excel and
   Microsoft Entra are trademarks of the Microsoft group of companies. Other
@@ -110,7 +110,9 @@ def title_and_copyright():
   Microsoft's terms for architecture diagrams and documentation.</p>
   <p><strong>Fictional content.</strong> Harbourline Group, Harbourline
   Connect, LedgerOne, SignBridge and all people, properties and data in
-  this book are fictional.</p>
+  this book are fictional, and any resemblance to real companies or people
+  is coincidental. Screens are illustrative mock-ups drawn with fictional
+  data, not screenshots.</p>
   <p><strong>Disclaimer.</strong> The information and code are provided
   "as is", without warranty. Cloud services change; verify limits,
   versions and portal paths against the cited Microsoft documentation
@@ -191,8 +193,9 @@ def build_docx(entries):
         f"---\ntitle: \"{html.unescape(TITLE)}\"\n"
         f"subtitle: \"{SUBTITLE}\"\nauthor: \"{AUTHOR}\"\n---\n\n"
         "Copyright © 2026 Vikash Kumar. All rights reserved. "
-        "Self-published. Companion code: MIT licence. All companies, "
-        "people and data are fictional. Microsoft product names are "
+        "Self-published by Vikash Kumar. Companion code: MIT licence. "
+        "All companies, people and data are fictional; screens are "
+        "illustrative mock-ups, not screenshots. Microsoft product names are "
         "trademarks of the Microsoft group of companies; this book is "
         "not endorsed by Microsoft.\n\n"
         + open(os.path.join(BOOK, "front", "preface.md"),

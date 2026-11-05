@@ -284,7 +284,7 @@ When workflow code changes while instances are running, old instances replay aga
 
 ## Guided lab: drive a signing workflow by hand
 
-**Requires:** the Durable Task Scheduler emulator (Chapter 3), the mocks, Service Bus with the `lease-signing` queue, and a lease `LSE-0042` with a tenant in your development environment (the setup tool's sample data includes one). Start the mocks and the Functions host.
+**Requires:** the Durable Task Scheduler emulator (Chapter 3), the mocks, Service Bus with the `lease-signing` queue, and the sample lease `LSE-0042` and its tenant (Chapter 4's `--sample-data`). Start the mocks and the Functions host.
 
 ### Lab 12.1 – Start a workflow
 

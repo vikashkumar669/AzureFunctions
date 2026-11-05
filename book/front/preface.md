@@ -20,7 +20,7 @@ A Windows, macOS or Linux computer with the .NET 10 SDK; an Azure subscription; 
 - **Part IV – Advanced Enterprise Implementations** (14–20): secure APIs, high volume, migration, Excel, monitoring, testing and DevOps.
 - **Part V – Capstone Projects** (21–25): four complete solutions and production readiness.
 
-Each chapter follows the same structure, from the business problem through architecture, step-by-step implementation, configuration, testing, troubleshooting, security, performance and design alternatives, to an exercise, a knowledge check and references. Appendices A–I collect standards, references, a troubleshooting catalogue, a glossary, the answers and interview questions.
+Each chapter follows the same structure, from the business problem through architecture, step-by-step implementation, configuration, testing, troubleshooting, security, performance and design alternatives, to an exercise, a knowledge check and references. Every chapter also has a **deep dive**, which looks behind one aspect of the topic, and a **guided lab**: numbered steps with commands, expected output and checkpoints, so you can confirm each result before moving on. Appendices A–N collect coding standards, configuration and authentication references, a troubleshooting catalogue, a glossary, the answers to the knowledge checks, interview questions with model answers, solution guides for the exercises, the set-up, reset and teardown of the lab environment, the full text of the key companion files, a command quick reference, and Harbourline's architecture decision records.
 
 ### The companion code
 
@@ -44,9 +44,9 @@ This book was written to a simple rule: say only what has been checked, and say 
 
 - **Platform facts** (limits, defaults, supported features, error codes) were checked against Microsoft Learn in October 2026 and are cited at the end of each chapter. Microsoft changes its platforms often; check the cited page before relying on a number.
 - **Code** is compiled and unit-tested by continuous integration on every change (91 tests at the time of writing), and the Bicep templates are compiled the same way. Unit tests prove the code's own logic; they don't prove behaviour against a live Dataverse environment or real partner systems. Run the integration and smoke checks described in Chapters 19 and 20 in your own environments before production use.
-- **Screenshots** are shown as clearly labelled placeholders with a capture plan (what to capture, where, and what to annotate), because portal screens change frequently and must be captured from the reader's or author's own tenant. Nothing presented as a screenshot is invented.
+- **Screens** are shown as **illustrative mock-ups**, not screenshots. Each one is drawn from generic components with fictional data, carries an *Illustrative mock-up* tag, and is captioned *Illustrative mock-up – not a screenshot*. Portal screens change often and differ between tenants, so the mock-ups show what to look for (the numbered callouts) rather than claiming to be an exact copy. A capture plan in the repository lists every screen, so real captures from your own tenant can replace them.
 - **Performance**: the book publishes no throughput or latency figures. It gives a measurement method and a results template, because numbers from one environment mislead in another.
-- **Sample output** marked *illustrative* shows the shape of real output with fictional data.
+- **Sample output** marked *illustrative*, including the expected output in the guided labs, shows the shape of real output with fictional data. Exact wording, identifiers and timings will differ in your environment and with other tool versions.
 
 ### A note on names
 

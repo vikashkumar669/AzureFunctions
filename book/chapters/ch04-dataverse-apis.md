@@ -316,7 +316,18 @@ Between QueryExpression and FetchXML the choice is mostly taste. QueryExpression
 
 Seeing raw requests and responses makes every SDK call easier to understand. In this lab you call your development environment's Web API directly, using a token from your own Azure CLI sign-in.
 
-**Requires:** the schema from Steps 1–4 and a few property rows (the setup tool in `samples/Harbourline.Setup` creates both), and the Azure CLI signed in as a user of the environment.
+**Requires:** the schema from Steps 1–4 and the fictional sample rows (run the setup tool in `samples/Harbourline.Setup` with `--sample-data` once the alternate keys are active), and the Azure CLI signed in as a user of the environment.
+
+### Lab 4.0 – Load the sample data
+
+Once Step 4's alternate keys show *Active*, add the fictional sample rows that the rest of the labs use:
+
+```bash
+dotnet run --project samples/Harbourline.Setup -- \
+  --url https://<your-dev-org>.crm11.dynamics.com --sample-data
+```
+
+**Checkpoint:** the tool ends with *Sample data: 3 properties, 1 tenant, 4 leases, 1 account.* Running it again changes nothing, because every row is upserted by its key.
 
 ### Lab 4.1 – Get a token and ask "who am I?"
 

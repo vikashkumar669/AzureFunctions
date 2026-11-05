@@ -140,15 +140,9 @@ Stop increasing parallelism when throughput stops rising or throttling appears. 
 
 Service protection limits aren't a penalty; they're Dataverse telling you how much one user may ask of one server at a time. Treat them as a design input and a bulk load becomes predictable.
 
-### The three limits
+### The three limits, read closely
 
-::: {#tbl:limits caption="Dataverse service protection limits, per user, per web server"}
-| Measure | Limit | Error code when exceeded |
-|---|---|---|
-| Number of requests | 6,000 in a five-minute sliding window | `0x80072322` |
-| Combined execution time | 20 minutes (1,200 seconds) in a five-minute sliding window | `0x80072321` |
-| Concurrent requests | 52 or higher | `0x80072326` |
-:::
+@tbl:limits lists the three limits. When one is exceeded, the fault carries its own error code: `0x80072322` for the number of requests, `0x80072321` for combined execution time, and `0x80072326` for concurrent requests. Logging the code tells you which limit you hit, and therefore which knob to turn.
 
 All three apply **per user**, and an integration's application user is one user. They apply **per web server**: an environment has several, and requests are spread across them, so the effective ceiling for an environment can be higher than the table suggests. That's also why you can't calculate an exact maximum throughput, and why you must measure.
 

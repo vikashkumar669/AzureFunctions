@@ -113,6 +113,10 @@ Add to the search operation's policy in API Management:
 
 The response depends only on these parameters, never on who asks, which is what makes a shared cache safe here. Never cache responses that depend on the caller's identity this way.
 
+::: note
+The caching policies need a cache to store responses in. Most API Management tiers include a built-in cache, but the **Consumption** tier used in Chapter 14 doesn't: there you must first configure an external Redis-compatible cache, such as Azure Managed Redis, for the API Management instance. Without one, these policies have nowhere to store responses. Weigh that extra resource against the in-memory cache of Step 2, which costs nothing.
+:::
+
 ### Step 5 – Load-test with a plan
 
 A load test answers a question; write the question first. Harbourline's plan:
@@ -132,6 +136,40 @@ A load test answers a question; write the question first. Harbourline's plan:
 Run it with **Azure Load Testing** (JMeter or Locust scripts) against the APIM URL, with test subscription keys. Run once with APIM caching off and once with it on; the difference in Dataverse calls is the value of the cache, measured.
 
 As in Chapter 15, this book publishes no results: they would describe the author's environment, not yours. Record yours in the plan's table, with the date and versions.
+
+## Deep dive: a consistency budget for cached reads
+
+Every cache trades freshness for speed. The question is never "should we cache?" but "how stale may this answer be, and who has agreed to that?" Harbourline calls the agreed staleness a **consistency budget**, and writes it next to each cached endpoint.
+
+### Where the staleness comes from
+
+A search response can be stale for several reasons that add up:
+
+::: {#tbl:staleness caption="Sources of staleness for one search response"}
+| Layer | Holds a response for | Shared by |
+|---|---|---|
+| In-memory cache in the Function App | Up to 60 s (`PropertySearch.CacheFor`) | Requests on the **same instance** only |
+| API Management cache (if configured) | Up to 60 s (`cache-store duration`) | All callers of the gateway |
+| `Cache-Control: public, max-age=60` | Up to 60 s | Browsers and proxies between the partner and you |
+:::
+
+In the worst case these can stack, so a change in Dataverse might take a few minutes to reach a partner's screen. For property search, Harbourline's lettings team agreed that "within five minutes" is fine: a newly let flat appearing for a few more minutes costs an email, while a slow search costs partners. For the order status endpoint (Chapter 24), the budget is zero, and nothing is cached.
+
+### Per-instance caches disagree
+
+The in-memory cache lives in each Function App instance. With five instances, five caches fill and expire independently, so two requests a second apart can return different versions of the same page. For search that's acceptable; for anything where users compare results ("I just saw it, now it's gone") it may not be. When consistency across instances matters, use a shared cache (Redis) or the gateway cache, which all instances sit behind.
+
+### Only cache what doesn't depend on the caller
+
+A shared cache returns one caller's response to another caller. That's safe only when the response depends on nothing but the cache key: here, the query parameters. Never cache, in a shared layer, responses that depend on who's asking (the lease pack in Chapter 22) or that contain personal data. The in-memory cache in `PropertySearch` builds its key from city, bedrooms and size only, and caches **only first pages**: cursor pages are rarely repeated, so caching them would fill memory for little gain.
+
+### Keyset paging and stable results
+
+The search pages by keyset: each page asks for rows after the last `(name, id)` pair of the previous page. Unlike page numbers, a keyset cursor never skips or repeats rows when rows are added or removed between requests, and every page costs the same, however deep. The trade-off is that a client can't jump to "page 7"; it can only go forward. For a partner API that feeds listings, that's the right trade.
+
+### Measure the cache's value
+
+A cache that's never hit only adds complexity. The two numbers that justify it are the **hit ratio** (from API Management analytics, or a counter around `GetOrCreateAsync`) and the **reduction in Dataverse calls** during a load test with the cache on and off (Step 5). If the hit ratio is low, the keys are too specific (for example, including `size` values that every client sets differently); standardize the parameters before adding more caching.
 
 ## Screens you will use
 
@@ -203,6 +241,64 @@ For full-text search, facets and relevance ranking, **Dataverse search** (for in
 - Write the load-test question and pass criteria before running it.
 - Keep public contracts minimal.
 
+## Guided lab: page, cache and observe
+
+**Requires:** the host running locally and the three sample properties in Leeds (Chapter 4's `--sample-data`).
+
+### Lab 23.1 – Page with a cursor
+
+Ask for one property per page:
+
+```bash
+curl -s "http://localhost:7071/api/v1/search/properties?city=Leeds&size=1" | jq
+```
+
+**Checkpoint:** one item (the first by name) and a `continuationToken`. Pass the token as `after` to get the next page, and repeat until no token comes back:
+
+```bash
+AFTER=$(curl -s "http://localhost:7071/api/v1/search/properties?city=Leeds&size=1" | jq -r .continuationToken)
+curl -s -G "http://localhost:7071/api/v1/search/properties" --data-urlencode "city=Leeds" \
+  --data-urlencode "size=1" --data-urlencode "after=$AFTER" | jq '.items[].name'
+```
+
+You see each sample property exactly once, in name order.
+
+### Lab 23.2 – A tampered cursor
+
+Change a character in `$AFTER` and call again. **Checkpoint:** `400` with the title *Invalid cursor*.
+
+### Lab 23.3 – See the cache at work
+
+1. Call the first page (`city=Leeds&size=1`) and note the rent of the first property.
+2. In Dynamics 365, change that property's monthly rent.
+3. Call the first page again immediately.
+
+**Checkpoint:** the old rent is still returned. Wait just over 60 seconds and call again: the new rent appears. You've just measured the in-memory cache's consistency budget.
+
+Now ask for the **second** page with the cursor (Lab 23.1) right after changing the second property's rent. **Checkpoint:** the new value appears at once, because cursor pages aren't cached.
+
+### Lab 23.4 – Check the response headers
+
+```bash
+curl -s -D - -o /dev/null "http://localhost:7071/api/v1/search/properties?city=Leeds&size=1"
+```
+
+**Checkpoint:** `Cache-Control: public, max-age=60`. Any HTTP cache between the caller and you may now keep the response for a minute; that's part of the consistency budget too.
+
+### Lab 23.5 – Count the Dataverse calls
+
+Run the first-page request 20 times in a row:
+
+```bash
+for i in $(seq 20); do curl -s -o /dev/null "http://localhost:7071/api/v1/search/properties?city=Leeds&size=1"; done
+```
+
+**Checkpoint:** in Application Insights (or the debug output), there's about one Dataverse query for these 20 requests, as long as they run on one instance within the minute. Repeat with `size=2` and then `size=3`: each new `size` is a new cache key and a new query. That's why API clients should use a standard page size.
+
+### Lab 23.6 – Write the budget down
+
+Add a line to the API's documentation (the OpenAPI description in `infra/apim/partner-api.openapi.yaml` has room for a description on the operation) saying how stale search results may be. **Checkpoint:** a partner reading the documentation would not be surprised by Lab 23.3.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -230,7 +326,10 @@ Answers are in Appendix G.
 
 - [Page results using FetchXml and QueryExpression](https://learn.microsoft.com/power-apps/developer/data-platform/fetchxml/page-results) – Microsoft Learn, checked 2026-10-27.
 - [Caching policies in API Management](https://learn.microsoft.com/azure/api-management/api-management-caching-policies) – Microsoft Learn, checked 2026-10-27.
+- [Caching overview for API Management](https://learn.microsoft.com/azure/api-management/caching-overview) – Microsoft Learn, checked 2026-11-05.
 - [What is Azure Load Testing?](https://learn.microsoft.com/azure/load-testing/overview-what-is-azure-load-testing) – Microsoft Learn, checked 2026-10-27.
 - [Caching in .NET](https://learn.microsoft.com/dotnet/core/extensions/caching) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: keyset paging, cursor, response cache, load test, p95 -->
+
+<!-- expanded: deep dive + guided lab -->

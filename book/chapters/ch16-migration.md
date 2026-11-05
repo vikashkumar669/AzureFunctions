@@ -282,7 +282,7 @@ Azure Data Factory, Dataflows and the Configuration Migration tool can all move 
 
 ## Guided lab: migrate, interrupt, resume and reconcile
 
-**Requires:** the schema from Chapter 4 (including the migration checkpoint table), your developer sign-in with rights to create properties, and the .NET SDK. The lab uses the Ops tool in `samples/Harbourline.Ops`, which runs on your machine and talks to Dataverse as you.
+**Requires:** the schema from Chapter 4 (the runner keeps its checkpoints in the `hl_syncstate` table), your developer sign-in with rights to create properties, and the .NET SDK. The lab uses the Ops tool in `samples/Harbourline.Ops`, which runs on your machine and talks to Dataverse as you.
 
 ### Lab 16.1 – Create a legacy extract
 
@@ -310,7 +310,7 @@ dotnet run --project samples/Harbourline.Ops -- migrate legacy-lab.csv lab-run-1
 
 While it's running, press **Ctrl+C** after a few batches have completed.
 
-**Checkpoint:** the tool stops. Open the migration checkpoint table (in the maker portal, or the admin app if you built one): a row for `lab-run-1` records the last completed batch.
+**Checkpoint:** the tool stops. Open the **Sync states** table: a row named `lab-run-1` records the last completed batch.
 
 ### Lab 16.3 – Resume
 

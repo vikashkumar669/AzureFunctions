@@ -280,16 +280,16 @@ S["21/account-sync"] = lambda: frame("Dynamics 365 — Sales Hub", "d365",
 # --- Chapter 22 ---------------------------------------------------------
 def _pack_cls(r, c):
     if r == 1: return "hdr"
-    if c == 2 and r > 1: return "num"
+    if c == 1 and r > 1: return "num"
     return ""
 
 S["22/pack-xlsx"] = lambda: frame("Microsoft Excel — lease-pack-LSE-0042.xlsx", "excel", grid(
     ["A", "B", "C", "D"], [
-        ["Invoice", "Due", "Amount {3}", "Status"],
-        ["INV-2026-0811", "01/09/2026", "1,250.00", "Paid"],
-        ["INV-2026-0911", "01/10/2026", "1,250.00", "Paid"],
-        ["INV-2026-1011", "01/11/2026", "1,250.00", "Open"],
-    ], _pack_cls, ["Lease summary {1}", "Invoices {2}"], 1, ("C2", "1250")), top=False)
+        ["Invoice", "Amount {3}", "Due date", "Status"],
+        ["INV-2026-0811", "1,250.00", "2026-09-01", "Paid"],
+        ["INV-2026-0911", "1,250.00", "2026-10-01", "Paid"],
+        ["INV-2026-1011", "1,250.00", "2026-11-01", "Open"],
+    ], _pack_cls, ["Lease {1}", "Invoices {2}"], 1, ("B2", "1250")), top=False)
 
 S["22/impersonation-role"] = lambda: frame("Power Platform admin center", "admin",
     h1("Harbourline Impersonation") +

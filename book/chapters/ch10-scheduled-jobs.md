@@ -270,11 +270,11 @@ A timer could also start a Durable Functions orchestration that fans out the wor
 
 ## Guided lab: run, break and recover the invoice sync
 
-**Requires:** the host and mocks from Chapter 3, the schema from Chapter 4 (including `hl_syncstate` and `hl_invoice`), and the identity from Chapter 5.
+**Requires:** the host and mocks from Chapter 3, the schema and sample data from Chapter 4 (the mock's three invoices refer to the sample leases `LSE-0001` to `LSE-0003`), and the identity from Chapter 5.
 
 ### Lab 10.1 – The first run
 
-Delete any existing checkpoint so the job starts from the beginning. In the Harbourline Admin app, open **Sync states** and delete the row named `ledgerone-invoices` if it exists. Then run the job on demand:
+Delete any existing checkpoint so the job starts from the beginning. Open the **Sync states** table (in the maker portal or a model-driven app) and delete the row named `ledgerone-invoices` if it exists. Then run the job on demand:
 
 ```bash
 curl -i -X POST http://localhost:7071/admin/functions/NightlyInvoiceSync \
@@ -284,7 +284,7 @@ curl -i -X POST http://localhost:7071/admin/functions/NightlyInvoiceSync \
 **Expected log line** (illustrative):
 
 ```text
-Invoice sync: 12 upserted, 0 failed, watermark 2026-10-27T09:41:07.5534120+00:00
+Invoice sync: 3 upserted, 0 failed, watermark 2026-10-27T09:41:07.5534120+00:00
 ```
 
 **Checkpoint:** a `ledgerone-invoices` row now exists in **Sync states**, its token equal to the watermark in the log, and the invoices appear in Dynamics 365.
@@ -293,7 +293,7 @@ Invoice sync: 12 upserted, 0 failed, watermark 2026-10-27T09:41:07.5534120+00:00
 
 Run the same command again immediately.
 
-**Checkpoint:** the log reports only the few invoices inside the five-minute overlap (often the same ones as before, or none), not the whole set. The upserts are idempotent: no duplicate invoices appear, because `hl_invoicenumber` is an alternate key.
+**Checkpoint:** the run succeeds and the watermark moves forward. The mock marks its three sample invoices as modified on every request, so they're upserted again; a real LedgerOne returns only the few records inside the five-minute overlap. Either way, no duplicate invoices appear in Dynamics 365, because `hl_invoicenumber` is an alternate key and every write is an upsert.
 
 ### Lab 10.3 – Make a run fail
 

@@ -260,13 +260,13 @@ Dynamics 365 itself can export views to Excel and import data from Excel, and fo
 
 ## Guided lab: round-trip a price review
 
-**Requires:** the host running locally with Dataverse configured, some invoices for September 2026 (the invoice sync from Chapter 10 creates them from the mock), and Excel or another spreadsheet program that opens `.xlsx` files.
+**Requires:** the host running locally with Dataverse configured, the three sample invoices due in October 2026 (Lab 10.1 creates them from the mock), and Excel or another spreadsheet program that opens `.xlsx` files.
 
 ### Lab 17.1 – Export a month
 
 ```bash
-curl -s -o invoices-2026-09.xlsx -w "%{http_code} %{content_type}\n" \
-  http://localhost:7071/api/v1/finance/invoices/2026-09
+curl -s -o invoices-2026-10.xlsx -w "%{http_code} %{content_type}\n" \
+  http://localhost:7071/api/v1/finance/invoices/2026-10
 ```
 
 **Expected output:**
