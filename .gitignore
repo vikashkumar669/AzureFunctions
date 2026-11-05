@@ -1,0 +1,26 @@
+## .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/*
+!.vscode/extensions.json
+TestResults/
+*.trx
+
+## Azure Functions local settings (contain environment URLs and may contain secrets)
+local.settings.json
+
+## Azurite local storage
+__azurite_db*__.json
+__blobstorage__/
+__queuestorage__/
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Book build output
+book/out/
+__pycache__/

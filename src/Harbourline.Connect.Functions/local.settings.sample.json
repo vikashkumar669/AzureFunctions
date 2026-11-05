@@ -1,0 +1,24 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+
+    "Dataverse__Url": "https://<your-dev-org>.crm.dynamics.com",
+    "Dataverse__OrganizationId": "<your-dev-org-id>",
+
+    "LedgerOne__BaseUrl": "http://localhost:5080/ledgerone/",
+    "LedgerOne__ApiKey": "local-development-key",
+    "SignBridge__BaseUrl": "http://localhost:5080/signbridge/",
+    "SignBridge__Scope": "api://<signbridge-app-id>/.default",
+    "SignBridge__CallbackSecret": "local-development-secret-at-least-32-chars",
+
+    "ServiceBus__fullyQualifiedNamespace": "<your-namespace>.servicebus.windows.net",
+    "FeedStorage": "UseDevelopmentStorage=true",
+    "Exports__BlobServiceUri": "https://<your-storage>.blob.core.windows.net/",
+
+    "DURABLE_TASK_SCHEDULER_CONNECTION_STRING": "Endpoint=http://localhost:8080;TaskHub=default;Authentication=None",
+    "InvoiceSyncSchedule": "0 0 2 * * *",
+    "Bulk__BatchSize": "200"
+  }
+}
