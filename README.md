@@ -28,7 +28,7 @@ AzureFunctions/
   tests/
     Harbourline.Connect.UnitTests/   xUnit + NSubstitute
   pipelines/                         Azure DevOps pipeline (alternative to GitHub Actions)
-  book/                              Manuscript sources and the screenshot capture plan
+  book/                              Manuscript sources, screen mock-ups and the capture plan
 ```
 
 Projects are added chapter by chapter; each chapter's finished state is tagged `ch-NN`.
