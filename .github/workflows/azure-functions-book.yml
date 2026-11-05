@@ -1,0 +1,70 @@
+# Builds and tests the companion code for the book
+# "Azure Functions for Dynamics 365 & Power Platform".
+name: azure-functions-book
+
+on:
+  push:
+    branches: [main, 'book/**']
+    paths-ignore: ['book/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: 'global.json'
+
+      # Build restores too: Azure.Functions.Sdk restores its generated
+      # extensions project during the build.
+      - name: Build
+        run: |
+          set -o pipefail
+          dotnet build HarbourlineConnect.slnx -c Release 2>&1 \
+            | tee build.log \
+            || { grep -E ': error ' build.log | sort -u \
+                 | sed -E 's#^.*/azurefunctions/##' | head -120 \
+                 | awk 'BEGIN{ORS="%0A"} {print}' \
+                 | sed 's/^/::error title=Build::/'; echo; exit 1; }
+
+      - name: Test
+        run: |
+          set -o pipefail
+          dotnet test --solution HarbourlineConnect.slnx \
+            -c Release --no-build 2>&1 \
+            | tee test.log \
+            || { grep -E -A4 'failed|error|Error' test.log | head -150 \
+                 | awk 'BEGIN{ORS="%0A"} {print}' \
+                 | sed 's/^/::error title=Test::/'; echo; exit 1; }
+          grep -iE 'passed|failed|total|succeeded' test.log | tail -5 \
+            | sed 's/^/::notice title=Tests::/' || true
+
+      # Compiles the Bicep templates (Chapter 20) to catch syntax and
+      # type errors. Deployment happens in the deploy workflow.
+      - name: Bicep build
+        run: |
+          set -o pipefail
+          for f in infra/*.bicep; do
+            az bicep build --file "$f" --stdout > /dev/null 2> bicep.log \
+              || { awk 'BEGIN{ORS="%0A"} {print}' bicep.log \
+                   | sed "s|^|::error title=Bicep $f::|"; echo; exit 1; }
+          done
+          echo "::notice title=Bicep::all templates compiled"
+
+      # Informational: lists packages with newer versions so the book's
+      # version statement can be kept current. Never fails the build.
+      - name: Outdated package report
+        if: always()
+        continue-on-error: true
+        run: |
+          dotnet list HarbourlineConnect.slnx package --outdated \
+            | tee outdated.txt
+          grep '>' outdated.txt | sed 's/^ *> */::notice title=Outdated::/' \
+            || echo "::notice title=Outdated::All packages current"

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 410" width="640" height="410" font-family="Inter, Arial, sans-serif" role="img" aria-label="Synchronous plug-ins run inside the Dataverse transaction; Azure Functions run outside it">
+  <title>Where code runs when a record is saved</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#4A5568"/>
+    </marker>
+  </defs>
+
+  <!-- Transaction band -->
+  <rect x="160" y="20" width="470" height="122" rx="8" fill="#E8F2FB" stroke="#0F6CBD" stroke-width="1.2"/>
+  <text x="174" y="40" font-size="12" font-weight="600" fill="#0F6CBD">Database transaction</text>
+  <text x="174" y="56" font-size="11" fill="#4A5568">an error here rolls back the whole save</text>
+
+  <!-- Stages -->
+  <g font-size="12" text-anchor="middle" fill="#0B1F3A">
+    <rect x="10" y="70" width="138" height="56" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="79" y="95" font-weight="600">PreValidation</text>
+    <text x="79" y="112" font-size="11" fill="#4A5568">stage 10</text>
+
+    <rect x="172" y="70" width="138" height="56" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="241" y="95" font-weight="600">PreOperation</text>
+    <text x="241" y="112" font-size="11" fill="#4A5568">stage 20</text>
+
+    <rect x="324" y="70" width="138" height="56" rx="6" fill="#0F6CBD"/>
+    <text x="393" y="95" font-weight="600" fill="#FFFFFF">Main operation</text>
+    <text x="393" y="112" font-size="11" fill="#E8F2FB">stage 30 · platform</text>
+
+    <rect x="476" y="70" width="138" height="56" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="545" y="95" font-weight="600">PostOperation</text>
+    <text x="545" y="112" font-size="11" fill="#4A5568">stage 40</text>
+  </g>
+  <g fill="none" stroke="#4A5568" stroke-width="1.4">
+    <path d="M148 98H168" marker-end="url(#a)"/>
+    <path d="M310 98H320" marker-end="url(#a)"/>
+    <path d="M462 98H472" marker-end="url(#a)"/>
+  </g>
+
+  <!-- Two-minute bracket -->
+  <path d="M10 152V160H614V152" fill="none" stroke="#9A5100" stroke-width="1.4"/>
+  <text x="10" y="178" font-size="11" font-weight="600" fill="#9A5100">whole operation incl. plug-ins: 2-minute limit, then TimeoutException</text>
+
+  <!-- Commit to async -->
+  <path d="M590 126V214" fill="none" stroke="#4A5568" stroke-width="1.6" marker-end="url(#a)"/>
+  <rect x="540" y="186" width="44" height="15" fill="#FFFFFF"/>
+  <text x="580" y="197" font-size="11" text-anchor="end" fill="#4A5568">commit</text>
+
+  <!-- Lower left: synchronous -->
+  <rect x="10" y="218" width="300" height="96" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="24" y="242" font-size="12.5" font-weight="600" fill="#0B1F3A">Synchronous plug-ins and webhooks</text>
+  <g font-size="11" fill="#4A5568">
+    <text x="24" y="262">can stop the save · the user waits</text>
+    <text x="24" y="280">Microsoft advises plug-ins under 2 seconds</text>
+    <text x="24" y="298">webhooks time out after 60 seconds</text>
+  </g>
+
+  <!-- Lower right: async and Functions -->
+  <rect x="380" y="218" width="250" height="52" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+  <text x="505" y="240" font-size="12.5" font-weight="600" text-anchor="middle" fill="#0B1F3A">Asynchronous service</text>
+  <text x="505" y="258" font-size="11" text-anchor="middle" fill="#4A5568">after commit · system jobs</text>
+
+  <path d="M505 270V296" fill="none" stroke="#4A5568" stroke-width="1.6" marker-end="url(#a)"/>
+
+  <rect x="380" y="300" width="250" height="96" rx="6" fill="#0B1F3A"/>
+  <text x="505" y="326" font-size="13.5" font-weight="700" text-anchor="middle" fill="#FFFFFF">Azure Functions</text>
+  <g font-size="11" text-anchor="middle" fill="#C9D6E8">
+    <text x="505" y="346">via async webhook or Service Bus</text>
+    <text x="505" y="363">outside the transaction</text>
+    <text x="505" y="380">own scale and time limits</text>
+  </g>
+</svg>

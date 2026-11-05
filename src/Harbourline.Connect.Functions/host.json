@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "telemetryMode": "OpenTelemetry",
+  "functionTimeout": "00:30:00",
+  "logging": {
+    "logLevel": {
+      "default": "Information",
+      "Host.Results": "Information",
+      "Function": "Information"
+    }
+  },
+  "extensions": {
+    "serviceBus": {
+      "maxConcurrentCalls": 8,
+      "maxAutoLockRenewalDuration": "00:10:00"
+    },
+    "durableTask": {
+      "hubName": "default",
+      "storageProvider": {
+        "type": "azureManaged",
+        "connectionStringName": "DURABLE_TASK_SCHEDULER_CONNECTION_STRING"
+      }
+    }
+  }
+}

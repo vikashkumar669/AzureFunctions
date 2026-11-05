@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" width="640" height="380" font-family="Inter, Arial, sans-serif" role="img" aria-label="On Flex Consumption, HTTP functions scale together, Blob functions together, and every other function scales on its own">
+  <title>Per-function scaling on Flex Consumption (illustrative instance counts)</title>
+
+  <rect x="10" y="10" width="620" height="300" rx="8" fill="#F5F9FD" stroke="#0F6CBD" stroke-width="1.2"/>
+  <text x="24" y="32" font-size="12.5" font-weight="600" fill="#0F6CBD">One Flex Consumption Function App</text>
+
+  <!-- Column helper: header, functions, instances -->
+  <g fill="#0B1F3A">
+    <!-- http group -->
+    <rect x="14" y="46" width="150" height="250" rx="6" fill="#FFFFFF" stroke="#0B1F3A"/>
+    <text x="24" y="68" font-size="12.5" font-weight="700">http group</text>
+    <text x="24" y="86" font-size="11" fill="#4A5568">Health</text>
+    <text x="24" y="101" font-size="11" fill="#4A5568">GetProperties</text>
+    <text x="24" y="116" font-size="11" fill="#4A5568">RequestLeaseSignature</text>
+
+    <!-- blob group -->
+    <rect x="168" y="46" width="150" height="250" rx="6" fill="#FFFFFF" stroke="#0B1F3A"/>
+    <text x="178" y="68" font-size="12.5" font-weight="700">blob group</text>
+    <text x="178" y="86" font-size="11" fill="#4A5568">OnPropertyFileArrived</text>
+
+    <!-- service bus function -->
+    <rect x="322" y="46" width="150" height="250" rx="6" fill="#FFFFFF" stroke="#0B1F3A"/>
+    <text x="332" y="68" font-size="12.5" font-weight="700">function:</text>
+    <text x="332" y="86" font-size="11" fill="#4A5568">OnOrderSubmitted</text>
+
+    <!-- timer function -->
+    <rect x="476" y="46" width="150" height="250" rx="6" fill="#FFFFFF" stroke="#0B1F3A"/>
+    <text x="486" y="68" font-size="12.5" font-weight="700">function:</text>
+    <text x="486" y="86" font-size="11" fill="#4A5568">NightlyInvoiceSync</text>
+  </g>
+
+  <!-- Instance stacks (illustrative) -->
+  <g fill="#0B1F3A">
+    <rect x="24" y="268" width="130" height="18" rx="3"/>
+    <rect x="24" y="246" width="130" height="18" rx="3"/>
+    <rect x="24" y="224" width="130" height="18" rx="3"/>
+    <rect x="24" y="202" width="130" height="18" rx="3"/>
+    <rect x="178" y="268" width="130" height="18" rx="3"/>
+    <rect x="332" y="268" width="130" height="18" rx="3"/>
+    <rect x="332" y="246" width="130" height="18" rx="3"/>
+    <rect x="332" y="224" width="130" height="18" rx="3"/>
+    <rect x="332" y="202" width="130" height="18" rx="3"/>
+    <rect x="332" y="180" width="130" height="18" rx="3"/>
+    <rect x="332" y="158" width="130" height="18" rx="3"/>
+    <rect x="486" y="268" width="130" height="18" rx="3" fill="#FFFFFF" stroke="#0B1F3A" stroke-dasharray="3 2"/>
+  </g>
+  <g font-size="11" fill="#4A5568" text-anchor="middle">
+    <text x="89" y="190">4 instances</text>
+    <text x="243" y="256">1 instance</text>
+    <text x="397" y="146">6 instances</text>
+    <text x="551" y="256">0 between runs</text>
+  </g>
+
+  <!-- Legend and notes -->
+  <rect x="10" y="326" width="18" height="12" rx="2" fill="#0B1F3A"/>
+  <text x="34" y="336" font-size="11" fill="#4A5568">instance running</text>
+  <rect x="150" y="326" width="18" height="12" rx="2" fill="#FFFFFF" stroke="#0B1F3A" stroke-dasharray="3 2"/>
+  <text x="174" y="336" font-size="11" fill="#4A5568">scaled to zero</text>
+  <text x="10" y="362" font-size="11" fill="#4A5568">Each group scales on its own. Default maximum 100 instances per group, configurable from 1 to 1,000.</text>
+</svg>

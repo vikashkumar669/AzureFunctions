@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>$if(appendix)$Appendix $chapter$ – $elseif(chapter)$Chapter $chapter$ – $endif$$title$</title>
+<meta name="author" content="Vikash Kumar">
+<link rel="stylesheet" href="book.css">
+</head>
+<body>
+$if(appendix)$
+<header class="appendix-head">
+  <p class="appendix-label">Appendix $chapter$</p>
+  <h1 class="chapter-title appendix-title">$title$</h1>
+</header>
+$else$
+<section class="opener">
+  <div class="opener-band">
+    <p class="opener-part">$part$</p>
+    <p class="opener-number">$chapter-padded$</p>
+    <h1 class="chapter-title">$title$</h1>
+    <p class="opener-summary">$build-summary$</p>
+  </div>
+  <div class="opener-body">
+    <p class="opener-label">What you’ll build</p>
+    <ul class="opener-builds">
+$for(builds)$
+      <li>$builds$</li>
+$endfor$
+    </ul>
+    <p class="opener-versions">Tested with: $versions$</p>
+  </div>
+</section>
+$endif$
+<main>
+$body$
+</main>
+</body>
+</html>

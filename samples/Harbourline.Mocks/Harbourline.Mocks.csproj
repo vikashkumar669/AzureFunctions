@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    Local stand-ins for the fictional LedgerOne and SignBridge APIs
+    (Chapter 8). Run: dotnet run -project samples/Harbourline.Mocks
+    Failure injection: FailureRate=0.3 makes 30% of calls return 503.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Harbourline.Mocks</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Harbourline.Connect.Core\Harbourline.Connect.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 430" width="640" height="430" font-family="Inter, Arial, sans-serif" role="img" aria-label="Inside a Function App the Functions host handles triggers and bindings and runs your code in a separate .NET worker process">
+  <title>Anatomy of a .NET isolated Function App</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#4A5568"/>
+    </marker>
+  </defs>
+
+  <!-- Trigger sources -->
+  <text x="10" y="30" font-size="11" font-weight="600" fill="#0F6CBD">TRIGGER SOURCES</text>
+  <g font-size="12" fill="#0B1F3A">
+    <rect x="10" y="44" width="140" height="40" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="22" y="69">HTTP request</text>
+    <rect x="10" y="100" width="140" height="40" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="22" y="125">Timer schedule</text>
+    <rect x="10" y="156" width="140" height="40" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="22" y="181">Service Bus queue</text>
+    <rect x="10" y="212" width="140" height="40" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="22" y="237">Blob (Event Grid)</text>
+  </g>
+
+  <!-- Function App boundary -->
+  <rect x="180" y="20" width="450" height="316" rx="8" fill="#F5F9FD" stroke="#0F6CBD" stroke-width="1.2"/>
+  <text x="194" y="40" font-size="12.5" font-weight="600" fill="#0F6CBD">Function App · one deployment, settings and identity</text>
+
+  <!-- Host -->
+  <rect x="200" y="56" width="180" height="196" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+  <text x="290" y="84" font-size="13.5" font-weight="700" text-anchor="middle" fill="#0B1F3A">Functions host</text>
+  <g font-size="11" text-anchor="middle" fill="#4A5568">
+    <text x="290" y="106">runtime 4.x, run by Azure</text>
+    <text x="290" y="126">listens to triggers</text>
+    <text x="290" y="146">runs input and output</text>
+    <text x="290" y="162">bindings</text>
+    <text x="290" y="182">reads host.json</text>
+    <text x="290" y="202">reports scale signals</text>
+  </g>
+
+  <!-- Worker -->
+  <rect x="430" y="56" width="180" height="196" rx="6" fill="#0B1F3A"/>
+  <text x="520" y="84" font-size="13.5" font-weight="700" text-anchor="middle" fill="#FFFFFF">.NET 10 worker</text>
+  <g font-size="11" text-anchor="middle" fill="#C9D6E8">
+    <text x="520" y="106">your process</text>
+    <text x="520" y="126">Program.cs: DI, config,</text>
+    <text x="520" y="142">middleware</text>
+    <text x="520" y="162">your function classes</text>
+    <text x="520" y="182">your NuGet versions</text>
+  </g>
+
+  <!-- gRPC -->
+  <g fill="none" stroke="#4A5568" stroke-width="1.6">
+    <path d="M380 140H426" marker-end="url(#a)"/>
+    <path d="M430 170H384" marker-end="url(#a)"/>
+  </g>
+  <text x="405" y="130" font-size="11" font-weight="600" text-anchor="middle" fill="#0B1F3A">gRPC</text>
+
+  <!-- Trigger arrows -->
+  <g fill="none" stroke="#4A5568" stroke-width="1.4">
+    <path d="M150 64H196" marker-end="url(#a)"/>
+    <path d="M150 120H196" marker-end="url(#a)"/>
+    <path d="M150 176H196" marker-end="url(#a)"/>
+    <path d="M150 232H196" marker-end="url(#a)"/>
+  </g>
+
+  <!-- Storage and telemetry -->
+  <rect x="200" y="276" width="180" height="44" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+  <text x="290" y="303" font-size="12" text-anchor="middle" fill="#0B1F3A">Host storage account</text>
+  <path d="M290 252V272" fill="none" stroke="#4A5568" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <rect x="430" y="276" width="180" height="44" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+  <text x="520" y="303" font-size="12" text-anchor="middle" fill="#0B1F3A">Application Insights</text>
+  <path d="M520 252V272" fill="none" stroke="#4A5568" stroke-width="1.4" marker-end="url(#a)"/>
+
+  <!-- Scale controller -->
+  <rect x="180" y="362" width="250" height="62" rx="6" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <text x="196" y="382" font-size="12.5" font-weight="600" fill="#0B1F3A">Scale controller (platform)</text>
+  <text x="196" y="399" font-size="11" fill="#4A5568">watches event rates, then adds</text>
+  <text x="196" y="414" font-size="11" fill="#4A5568">or removes instances</text>
+  <path d="M305 362V340" fill="none" stroke="#4A5568" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="450" y="400" font-size="11" fill="#4A5568">each instance runs one host</text>
+  <text x="450" y="415" font-size="11" fill="#4A5568">and one worker</text>
+</svg>

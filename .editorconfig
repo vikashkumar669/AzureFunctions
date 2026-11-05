@@ -1,0 +1,30 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+# Book layout: code listings wrap at 72 characters, so keep lines short.
+max_line_length = 72
+
+[*.{json,yml,yaml,xml,csproj,props,slnx}]
+indent_size = 2
+
+[*.cs]
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_style_require_accessibility_modifiers = always:warning
+
+# Async methods end with Async
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_methods
+dotnet_naming_rule.async_methods_end_in_async.style = end_in_async
+dotnet_naming_rule.async_methods_end_in_async.severity = suggestion
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.end_in_async.required_suffix = Async
+dotnet_naming_style.end_in_async.capitalization = pascal_case
