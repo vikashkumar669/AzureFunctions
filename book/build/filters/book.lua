@@ -192,7 +192,59 @@ local function table_div(div)
     pandoc.Attr(div.identifier, { "table-wrap" })), false
 end
 
+local function annotation_key(a)
+  -- "1 Status: On; 2 Save" -> "❶ Status: On  ❷ Save"
+  local out = pandoc.Inlines({})
+  for item in (a["annotations"] or ""):gmatch("[^;]+") do
+    local n, text = item:match("^%s*(%d)%s+(.-)%s*$")
+    if n then
+      if #out > 0 then out:extend({ pandoc.Space(), pandoc.Space() }) end
+      out:insert(pandoc.Str(markers[tonumber(n)] or n))
+      out:insert(pandoc.Space())
+      out:extend(md_inlines(text))
+    end
+  end
+  return out
+end
+
+local function mockup_path(div)
+  -- Mock-ups (or real captures) live in figures/captures/<NN>-<id>.png.
+  local id = div.identifier:gsub("^fig:", "")
+  local rel = string.format("figures/captures/%02d-%s.png",
+    tonumber(chapter) or 0, id)
+  local f = io.open(code_root .. "/book/" .. rel, "r")
+  if f then f:close(); return rel end
+  return nil
+end
+
+local function mockup_figure(div, rel)
+  local a = div.attributes
+  local label = next_label("fig", div.identifier)
+  local cap = label_inlines(label, md_inlines(a["caption"]))
+  cap:extend({ pandoc.Space(), pandoc.Emph(md_inlines(
+    "Illustrative mock-up – not a screenshot.")) })
+  local key = annotation_key(a)
+  if #key > 0 then
+    cap:insert(pandoc.LineBreak())
+    cap:extend(key)
+  end
+  local img = pandoc.Image({}, rel)
+  if not is_docx then
+    return pandoc.Div({
+      pandoc.Para({ img }),
+      pandoc.Div({ pandoc.Para(cap) }, pandoc.Attr("", { "mockup-caption" })),
+    }, pandoc.Attr(div.identifier, { "mockup" })), false
+  end
+  img.attributes["width"] = "100%"
+  return pandoc.Div({
+    styled({ pandoc.Para({ img }) }, "Captioned Figure"),
+    styled({ pandoc.Para(cap) }, "Image Caption"),
+  }, pandoc.Attr(div.identifier, {})), false
+end
+
 local function capture_div(div)
+  local rel = mockup_path(div)
+  if rel then return mockup_figure(div, rel) end
   local a = div.attributes
   local label = next_label("fig", div.identifier)
 

@@ -140,6 +140,59 @@ Set a lease to *Awaiting signature* (Chapter 9). Open the dashboard: the instanc
 
 To test reminders without waiting three days, set `ReminderEvery` to a few minutes in a development build.
 
+## Deep dive: living with long-running workflows
+
+A lease signing can take a week. During that week you will deploy new code, rotate secrets and perhaps fix a bug in the workflow itself. This section covers what changes when code runs for days instead of seconds.
+
+### Replay, step by step
+
+The orchestrator in Step 2 doesn't stay in memory while it waits. Each time something happens (an activity finishes, a timer fires, an event arrives), the Durable Task framework loads the instance's **history** and runs the orchestrator function again from the top. Calls whose results are already in the history return those results immediately instead of running again. The function reaches the point where it last stopped, then continues with the new event.
+
+::: {#tbl:replay caption="One signing workflow, seen as history"}
+| Moment | New history event | What the replay does |
+|---|---|---|
+| Start | `ExecutionStarted` (input `LSE-0042`) | Schedules `SendEnvelope`, then stops |
+| Envelope sent | `TaskCompleted` (envelope ID) | Replays to the loop, creates the timer and waits for the event |
+| Three days pass | `TimerFired` | Replays, sees the timer won, schedules `SendReminder` |
+| Tenant signs | `EventRaised` `SignatureCompleted` | Replays, sees the event won, schedules `SetStatus(Active)` |
+| Status set | `TaskCompleted` | Replays to the `return`; the instance completes with `"Active"` |
+:::
+
+That's why the orchestrator must be **deterministic**: given the same history, it must make the same decisions in the same order. The rules you met in this chapter follow from it:
+
+- Use `context.CurrentUtcDateTime`, never `DateTime.UtcNow`, which would differ on every replay.
+- Use `context.NewGuid()` for identifiers, never `Guid.NewGuid()`.
+- Do no I/O in the orchestrator: no HTTP calls, no Dataverse, no logging through a normal logger (use `context.CreateReplaySafeLogger`). Put all of that in activities.
+- Don't branch on configuration that can change between replays. Pass such values in as input.
+
+### Changing code while instances are running
+
+Suppose you add a step between `SendEnvelope` and the wait. An instance that started yesterday has a history in which the next event after `SendEnvelope` is a timer. Replaying it with the new code, the orchestrator now schedules your new activity instead, which doesn't match the history. The framework detects such **non-deterministic** changes and fails the instance.
+
+Three ways to deploy safely, from simplest to most flexible:
+
+1. **Drain first.** Stop starting new instances, wait until running ones finish, then deploy. Fine for short workflows, impractical for week-long ones.
+2. **Side by side.** Deploy the changed workflow under a **new name** (`LeaseSigningOrchestrationV2`), start new instances with it, and keep the old orchestrator until its last instance completes. Delete it in a later release.
+3. **Branch on input.** Add a version number to the input when starting an instance, and let the orchestrator choose paths by that number. Old instances keep their old input, so their replays take the old path.
+
+Changes **inside** activities are always safe: activities aren't replayed, and their results are already stored. Prefer putting logic in activities partly for this reason.
+
+### Keep histories short
+
+Every replay reads the whole history, so very long histories slow instances down. A workflow that loops many times, for example one that polls something hourly for months, should periodically call `ContinueAsNew` to restart itself with fresh state and an empty history. Harbourline's signing loop runs at most three times, so it doesn't need to.
+
+### Instance IDs as business keys
+
+`StartLeaseSigning` uses `lease-signing-<lease number>` as the instance ID and checks whether that instance is already running. That gives you three properties for free: a duplicate webhook or message can't start a second workflow; the callback can find the instance from the envelope's reference without a lookup table; and operators can find a lease's workflow in the dashboard by typing its number.
+
+### Operating the scheduler
+
+The scheduler keeps instance histories until they're purged. Decide on a retention period (Harbourline keeps completed instances for 90 days, for support questions) and configure the scheduler's **autopurge retention policy** to remove older ones, rather than writing your own purge job. Give operators the *Durable Task Data Reader* role for the dashboard in production; only the Function App needs *Durable Task Data Contributor*.
+
+::: warning
+Never "fix" a stuck instance by editing data behind the framework's back. Use the supported operations: raise the event it's waiting for, terminate it, or purge it, and record why.
+:::
+
 ## Screens you will use
 
 ::: {.capture #fig:dts-dashboard caption="The Durable Task Scheduler dashboard shows each lease's workflow and its history." app="Durable Task Scheduler dashboard" path="http://localhost:8082 › Task hub default › Orchestrations" annotations="1 Instance ID lease-signing-LSE-0042; 2 Status Running; 3 History: SendEnvelope completed; 4 Pending timer"}
@@ -229,6 +282,72 @@ When workflow code changes while instances are running, old instances replay aga
 - Keep inputs and outputs small.
 - Authenticate callbacks to anonymous endpoints with signatures.
 
+## Guided lab: drive a signing workflow by hand
+
+**Requires:** the Durable Task Scheduler emulator (Chapter 3), the mocks, Service Bus with the `lease-signing` queue, and a lease `LSE-0042` with a tenant in your development environment (the setup tool's sample data includes one). Start the mocks and the Functions host.
+
+### Lab 12.1 – Start a workflow
+
+Send a message with the body `LSE-0042` to the `lease-signing` queue: either run Lab 9.5 again (the webhook queues it), or use **Send messages** in the queue's Service Bus Explorer.
+
+**Checkpoint:** the host log shows `StartLeaseSigning`, then `LeaseSigningOrchestration` and `SendEnvelope`. In the dashboard at `http://localhost:8082`, the instance `lease-signing-LSE-0042` is *Running*. In Dynamics 365, the lease's status is *Awaiting signature* and its envelope ID column holds an `ENV-…` value from the mock.
+
+### Lab 12.2 – Try to start it twice
+
+Send the same `LSE-0042` message again.
+
+**Checkpoint:** the log reports that the workflow is already running, and the dashboard still shows exactly one instance. The instance ID is doing its job.
+
+### Lab 12.3 – Look at the history
+
+Open the instance in the dashboard and view its history.
+
+**Checkpoint:** you see the start event, the scheduled and completed `SendEnvelope` task, and a timer due three days from now. The orchestrator isn't running; nothing is consuming CPU while it waits.
+
+### Lab 12.4 – Sign, with a forged callback first
+
+Prepare a callback body using the envelope ID from Lab 12.1, and sign it with the development secret from `local.settings.json` (`SignBridge__CallbackSecret`):
+
+```bash
+BODY='{"envelopeId":"ENV-<from-lab-12.1>","reference":"LSE-0042","status":"Signed"}'
+SECRET='local-development-secret-at-least-32-chars'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $NF}')
+```
+
+First send it with a wrong signature:
+
+```bash
+curl -i -X POST http://localhost:7071/api/callbacks/signbridge \
+  -H "Content-Type: application/json" -H "X-SignBridge-Signature: 00ff" -d "$BODY"
+```
+
+**Checkpoint:** `401 Unauthorized`, and the instance is still running. Now send it properly signed:
+
+```bash
+curl -i -X POST http://localhost:7071/api/callbacks/signbridge \
+  -H "Content-Type: application/json" -H "X-SignBridge-Signature: $SIG" -d "$BODY"
+```
+
+**Checkpoint:** `202 Accepted`. Within seconds the dashboard shows the instance *Completed* with the output `"Active"`, and the lease in Dynamics 365 is *Active*.
+
+::: tip
+The signature covers the exact bytes of the body. If the callback is rejected, check that `$BODY` in both commands is identical, including spaces. `printf '%s'` avoids the trailing newline that `echo` would add.
+:::
+
+### Lab 12.5 – A late callback
+
+Send the signed callback a second time.
+
+**Checkpoint:** `200 OK` and no change: the instance is no longer running, so the callback is acknowledged and ignored. Partners retry callbacks; your endpoint must tolerate that.
+
+### Lab 12.6 – Decline and expiry (optional)
+
+Repeat the lab for another sample lease with `"status":"Declined"`: the instance completes with `"Declined"` and the lease becomes *Declined*. To see the reminder path without waiting three days, temporarily change `ReminderEvery` in `LeaseSigning.cs` to `TimeSpan.FromMinutes(1)`, start a new instance and watch `SendReminder` run twice before the instance completes with `"Expired"`. Change the value back afterwards; never commit a shortened timer.
+
+### Lab 12.7 – Clean up
+
+Use the dashboard to purge the completed lab instances, or simply restart the emulator container, which keeps no data between runs.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -271,3 +390,5 @@ Answers are in Appendix G.
 - [Rolling updates in Flex Consumption](https://learn.microsoft.com/azure/azure-functions/flex-consumption-site-updates) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: Durable Functions, orchestrator function, activity function, client function, entity function, replay, deterministic, durable timer, external event, instance ID, Durable Task Scheduler, HMAC -->
+
+<!-- expanded: deep dive + guided lab -->

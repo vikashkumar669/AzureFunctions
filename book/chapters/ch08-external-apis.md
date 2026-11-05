@@ -138,6 +138,46 @@ The mocks fail a configurable share of requests with 503 or 429 (@lst:mockfail) 
 
 Start the mocks with `FailureRate=0.3`, run the app, and call an endpoint that uses LedgerOne several times. The logs show failed attempts followed by successes; the caller sees only successes, slightly slower.
 
+## Deep dive: how the standard resilience pipeline behaves
+
+`AddStandardResilienceHandler` adds five strategies in a fixed order around every request. The order matters: each strategy wraps the ones inside it, so a timeout outside the retry limits **all** attempts together, while a timeout inside it limits **each** attempt.
+
+::: {#tbl:pipeline caption="The standard resilience pipeline, outermost first"}
+| Order | Strategy | What it does | Harbourline setting |
+|---|---|---|---|
+| 1 | Rate limiter | Caps concurrent requests from this client | Default |
+| 2 | Total request timeout | Limits the whole call, including all retries | 45 s |
+| 3 | Retry | Retries transient failures with backoff and jitter | 3 retries |
+| 4 | Circuit breaker | Stops calling a failing service for a while | 30 s sampling |
+| 5 | Attempt timeout | Limits each individual attempt | 10 s |
+:::
+
+### What counts as transient
+
+By default, the retry and circuit-breaker strategies treat these outcomes as transient: network errors (`HttpRequestException`), attempt timeouts, HTTP **408**, **429** and **5xx** responses. A **4xx** other than 408 and 429 is not retried, because sending the same bad request again gives the same answer. That default matches the rule in this chapter: retry what might succeed next time, and never retry what can't.
+
+When the server sends a `Retry-After` header with a 429 or 503, the retry strategy honours it instead of its own backoff delay. LedgerOne's mock sends `Retry-After: 1`, which is why the retries you see in the lab are about a second apart.
+
+### Budgets: make the timeouts add up
+
+Timeouts must fit inside each other and inside the function's own limits:
+
+> attempts × attempt timeout + backoff delays ≤ total request timeout ≤ time the caller can wait
+
+With four attempts (the first plus three retries) at up to 10 s each, plus backoff, a worst case can approach the 45-second total. That's acceptable for a timer job or a queue handler. It's **not** acceptable inside an HTTP function that a person is waiting for, or inside a Dataverse webhook, which gives up after 60 seconds (Chapter 9). For those paths, use shorter attempt timeouts and fewer retries, or move the call behind a queue.
+
+### The circuit breaker protects both sides
+
+When most recent calls fail, the circuit breaker **opens** and fails new calls immediately, without contacting the partner, for a break period. Then it lets a trial request through. If that succeeds, the circuit **closes** again. An open circuit shows up in your logs as `BrokenCircuitException`. That's a feature: a struggling partner gets breathing room, and your function fails fast instead of piling up waiting requests. Treat the exception as transient in your own error handling, so queue messages are retried later rather than dead-lettered (Chapter 11).
+
+### Unsafe methods and duplicates
+
+A retry is only safe when repeating the request can't do harm. `GET`, `PUT` and `DELETE` are idempotent by definition. `POST` usually isn't: retrying "create envelope" after a timeout may create two envelopes if the first request actually succeeded. The SignBridge registration therefore calls `DisableForUnsafeHttpMethods()`. LedgerOne's order endpoint takes a different route to the same goal: it accepts an `Idempotency-Key` header and returns the original receipt for a repeated key, so retries are safe **and** useful. Prefer that design whenever you control or can influence the partner's API.
+
+::: warning
+Retries multiply load. Three retries per call in a function that scales to 20 instances can send a struggling partner four times its normal traffic. The circuit breaker and `Retry-After` limit the damage; a maximum instance count (Chapter 2) limits it further.
+:::
+
 ## Screens you will use
 
 ::: {.capture #fig:retries caption="Application Insights shows the retried dependency calls behind one successful operation." app="Azure portal" path="Application Insights › Transaction search › an operation › End-to-end transaction details" annotations="1 First attempt: 503; 2 Retry after backoff: 200; 3 Total duration"}
@@ -219,6 +259,98 @@ You could write retry loops by hand. Harbourline doesn't: hand-written loops usu
 - Keep keys in Key Vault and prefer Entra ID tokens where the partner supports them.
 - Develop and test against mocks that fail on purpose.
 
+## Guided lab: break the partner on purpose
+
+The mock APIs in `samples/Harbourline.Mocks` can fail a share of requests on demand, which makes resilience visible. **Requires:** the .NET SDK and `curl`; no Azure resources.
+
+### Lab 8.1 – Call LedgerOne directly
+
+Start the mocks with no failures:
+
+```bash
+dotnet run --project samples/Harbourline.Mocks
+```
+
+In a second terminal, call an endpoint without and then with the API key:
+
+```bash
+curl -i http://localhost:5080/ledgerone/customers/C-1001
+curl -i http://localhost:5080/ledgerone/customers/C-1001 \
+     -H "x-api-key: local-development-key"
+```
+
+**Checkpoint:** the first call returns **401**; the second returns the customer (or 404 if the mock has no such customer yet). The typed client adds the key for you, from the `LedgerOne__ApiKey` setting.
+
+### Lab 8.2 – Prove the idempotency key works
+
+Submit the same order twice with the same key, then once with a different key:
+
+```bash
+for key in order-ORD-20001 order-ORD-20001 order-ORD-20002; do
+  curl -s -X POST http://localhost:5080/ledgerone/orders \
+    -H "x-api-key: local-development-key" -H "Content-Type: application/json" \
+    -H "Idempotency-Key: $key" \
+    -d '{"orderNumber":"ORD-20001","propertyCode":"HBR-0042","category":"repair","amount":120.00}'
+  echo
+done
+```
+
+**Expected output** (illustrative; IDs are random):
+
+```text
+{"ledgerOrderId":"L1-3f9a0c21"}
+{"ledgerOrderId":"L1-3f9a0c21"}
+{"ledgerOrderId":"L1-7be41d09"}
+```
+
+**Checkpoint:** the first two receipts are identical. A retried request is recognised; a request with a new key is treated as new. Without the header the mock answers 400, because LedgerOne requires it.
+
+### Lab 8.3 – Turn on failures
+
+Stop the mocks and restart them with half of all requests failing:
+
+```bash
+dotnet run --project samples/Harbourline.Mocks -- --FailureRate=0.5
+```
+
+Repeat a plain `curl` call to `/ledgerone/customers/C-1001` with the key ten times:
+
+```bash
+for i in $(seq 10); do
+  curl -s -o /dev/null -w "%{http_code} " http://localhost:5080/ledgerone/customers/C-1001 \
+    -H "x-api-key: local-development-key"
+done; echo
+```
+
+**Expected output** (illustrative; random each time):
+
+```text
+200 503 429 200 200 503 200 429 503 200
+```
+
+**Checkpoint:** roughly half the calls fail with 503 or 429. `curl` has no retries, so every failure reaches you.
+
+### Lab 8.4 – Watch the client recover
+
+With the mocks still failing half the time, start the Functions host and run the invoice sync on demand (Chapter 2's admin endpoint):
+
+```bash
+curl -i -X POST http://localhost:7071/admin/functions/NightlyInvoiceSync \
+     -H "Content-Type: application/json" -d '{ "input": "" }'
+```
+
+**Checkpoint:** in the host log, look for warnings from the resilience pipeline about retries, followed by a successful run. Most runs succeed even though half the underlying requests failed. Run it several times: occasionally all four attempts of one request fail, the run fails, and the checkpoint isn't advanced, so the next run picks up the same changes (Chapter 10).
+
+### Lab 8.5 – Exhaust the budget
+
+Restart the mocks with `--FailureRate=0.95` and run the sync again.
+
+**Checkpoint:** the run fails after the retries are used up, and later calls may fail immediately with a broken-circuit error while the circuit is open. Nothing was half-written: the checkpoint stays where it was. Set the failure rate back to 0 when you're done.
+
+### Lab 8.6 – Reflect
+
+Answer in a sentence each: Why does the order endpoint need an idempotency key when `GET /customers` doesn't? What would happen to the webhook from Chapter 9 if its LedgerOne call used the 45-second budget? Compare your answers with the *Deep dive* above.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -260,3 +392,5 @@ Answers are in Appendix G.
 - [Manage connections in Azure Functions](https://learn.microsoft.com/azure/azure-functions/manage-connections) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: typed client, IHttpClientFactory, retry, jitter, circuit breaker, attempt timeout, idempotent, idempotency key -->
+
+<!-- expanded: deep dive + guided lab -->

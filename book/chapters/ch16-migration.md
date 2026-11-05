@@ -149,6 +149,55 @@ dotnet run --project samples/Harbourline.Ops -- reconcile legacy-properties.csv
 
 Run the whole migration at least twice in a test environment loaded with a recent copy of production. Time it, fix rejected rows at source or agree rules for them, and reconcile each time. On the cut-over weekend: freeze the old system, extract, migrate, reconcile, and switch users over only when the report says MATCH and the business has signed it.
 
+## Deep dive: planning the cut-over weekend
+
+The code in this chapter moves data correctly. A migration succeeds or fails on the plan around the code: when the old system stops accepting changes, how long the load takes, who decides to go or roll back, and what happens to changes made during the move.
+
+### Choose a cut-over strategy
+
+::: {#tbl:cutover caption="Cut-over strategies compared"}
+| Strategy | How it works | Downtime | Complexity | Good for |
+|---|---|---|---|---|
+| Big bang | Freeze the old system, load everything, switch | The whole load | Low | Up to a few million rows that load in hours |
+| Bulk + delta | Load history in advance; at cut-over, load only rows changed since | Delta load only | Medium | Large volumes with a changes-since query on the source |
+| Phased | Move one region, business unit or table at a time | Per phase | High | Large organizations; needs both systems live together |
+| Parallel run | Both systems live; integration keeps them in step | None | Highest | Rarely worth it; consider only for short, critical periods |
+:::
+
+Harbourline chose **bulk + delta**: the 8,400 legacy properties and three years of history load the week before; on cut-over Saturday, only properties changed since the bulk load move again. The upserts by alternate key make that safe: a delta load is just another run of the same code with a smaller input.
+
+### Rehearse until it's boring
+
+Every rehearsal runs against a fresh copy of production-like data in a test environment and measures three things: **duration** of each step, **rejections** by reason, and **reconciliation** results. Harbourline held three rehearsals. The first found 61 rows with unknown state codes and a rent column using a currency symbol; the second ran clean but took 40% longer than planned because of an audit setting; the third matched the plan within ten minutes. Only then was the date confirmed.
+
+### The run sheet
+
+A run sheet lists every step with an owner, a planned time and a check. An extract:
+
+| Time | Step | Owner | Check |
+|---|---|---|---|
+| Fri 18:00 | Freeze legacy system (read-only) | Legacy admin | Test edit is refused |
+| Fri 18:15 | Export delta since bulk load | Legacy admin | Row count noted |
+| Fri 18:30 | Run delta migration | Integration dev | `Migrated` + rejected = source rows |
+| Fri 19:30 | Reconcile | Integration dev | `MATCH` |
+| Fri 20:00 | Business smoke test (10 named properties) | Lettings lead | All ten correct |
+| Fri 20:30 | **Go / no-go** | Project sponsor | Decision recorded |
+| Fri 21:00 | Enable integrations (sync jobs, webhooks) | Integration dev | First runs succeed |
+
+The **go/no-go** step needs written criteria agreed in advance, for example "reconciliation matches, fewer than 0.5% rows rejected, all rejections understood, smoke test passed". Without criteria, the decision is made by whoever is most tired.
+
+### Rollback
+
+Plan what "no-go" means before the weekend. For a bulk + delta migration, rollback is usually simple: the legacy system becomes writable again and Dynamics 365 isn't used yet. It gets harder once users start working in the new system, because their changes must then be carried back or re-keyed. That's why integrations and user access are switched on **after** the go decision, not before.
+
+### Rejected rows are a business decision
+
+The migration never "fixes" data silently. Rejected rows go to a list with reasons; the business decides, row by row or rule by rule, whether to fix the source and re-run, fix in Dynamics 365 afterwards, or drop the record. Record the decision for each reason. Auditors and future colleagues will ask.
+
+::: tip
+Keep the legacy export files and migration reports for an agreed period, read-only. When someone asks in six months why a property has no rent history before 2024, the answer is in the report, not in anyone's memory.
+:::
+
 ## Screens you will use
 
 ::: {.capture #fig:migrate-run caption="A migration run resumed after an interruption." app="Terminal" path="dotnet run --project samples/Harbourline.Ops -- migrate …" annotations="1 Resumed after batch; 2 Migrated count; 3 Rejected rows with reasons"}
@@ -231,6 +280,86 @@ Azure Data Factory, Dataflows and the Configuration Migration tool can all move 
 - Reconcile independently: counts, fingerprints, checksums.
 - Rehearse at least twice, time it, and get sign-off on the report.
 
+## Guided lab: migrate, interrupt, resume and reconcile
+
+**Requires:** the schema from Chapter 4 (including the migration checkpoint table), your developer sign-in with rights to create properties, and the .NET SDK. The lab uses the Ops tool in `samples/Harbourline.Ops`, which runs on your machine and talks to Dataverse as you.
+
+### Lab 16.1 – Create a legacy extract
+
+```bash
+python3 - <<'EOF' > legacy-lab.csv
+import random
+random.seed(7)
+print("PROP_REF,ADDRESS_LINE,TOWN,POST_CODE,BEDS,RENT_PCM,STATE,AVAIL_DATE")
+for i in range(1, 2001):
+    state = random.choice("AALLM")
+    if i in (731, 1210): state = "X"           # deliberately bad
+    rent = f"{700 + i % 900:,}.00"              # e.g. "1,250.00"
+    print(f"{7000 + i},{i} Lab Street,Leeds,LS1 1AA,{i % 5},\"{rent}\",{state},01/12/2026")
+EOF
+head -3 legacy-lab.csv
+```
+
+**Checkpoint:** a header in the legacy style (`PROP_REF`, `RENT_PCM`, …) and 2,000 rows, two with an unknown state code. The rent uses a thousands separator and the date is in UK format, just like the real export.
+
+### Lab 16.2 – Start the migration, then interrupt it
+
+```bash
+dotnet run --project samples/Harbourline.Ops -- migrate legacy-lab.csv lab-run-1
+```
+
+While it's running, press **Ctrl+C** after a few batches have completed.
+
+**Checkpoint:** the tool stops. Open the migration checkpoint table (in the maker portal, or the admin app if you built one): a row for `lab-run-1` records the last completed batch.
+
+### Lab 16.3 – Resume
+
+Run exactly the same command again.
+
+**Expected output** (illustrative):
+
+```text
+Source rows: 2000
+Migrated:    1998
+Resumed after batch: 4
+  HBR-7731: Unknown state 'X'.
+  HBR-8210: Unknown state 'X'.
+```
+
+**Checkpoint:** the tool skipped the batches already done, migrated the rest, and listed the two bad rows by their new code with a reason. Nothing was loaded twice: the properties are upserted by code, and the checkpoint prevented re-sending completed batches.
+
+### Lab 16.4 – Reconcile
+
+```bash
+dotnet run --project samples/Harbourline.Ops -- reconcile legacy-lab.csv
+```
+
+**Expected output** (illustrative):
+
+```text
+Source 1998, target 2011
+Missing:   0
+Different: 0
+Checksums: 4be1907a2c5d / 4be1907a2c5d
+MATCH
+```
+
+**Checkpoint:** `MATCH`. The source count is 1,998, not 2,000, because the reconciler compares only rows that the mapping accepts; the two rejected rows are accounted for in the migration report instead. The target count is every property in the table, including the ones you created in earlier chapters, so it's usually higher. The verdict depends on missing and different rows, and the target checksum covers only the codes in the source.
+
+### Lab 16.5 – Make reconciliation fail
+
+In Dynamics 365, change the monthly rent of `HBR-7005` by one penny, then reconcile again.
+
+**Checkpoint:** `Different: 1` and `MISMATCH`, with different checksums. Reconciliation catches a single changed value among two thousand rows. Change the rent back (or re-run the migration under a new run name, which re-upserts every row) and reconcile once more to see `MATCH`.
+
+### Lab 16.6 – Plan your own run sheet
+
+Take the run-sheet extract above and extend it to a complete weekend for a migration you know, including the rehearsal dates, the go/no-go criteria, and the rollback steps. **Checkpoint:** every step has an owner and a check that someone other than the owner could verify.
+
+### Lab 16.7 – Clean up
+
+Delete the lab properties (codes `HBR-7001` to `HBR-9000`) with a bulk delete job, and delete the `lab-run-1` checkpoint row.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -271,3 +400,5 @@ Answers are in Appendix G.
 - [Use bulk operation messages](https://learn.microsoft.com/power-apps/developer/data-platform/bulk-operations) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: mapping specification, extract, reconciliation, fingerprint, checksum, cut-over, rehearsal -->
+
+<!-- expanded: deep dive + guided lab -->

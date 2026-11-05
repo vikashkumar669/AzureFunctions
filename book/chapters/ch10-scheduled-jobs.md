@@ -128,6 +128,52 @@ curl -X POST http://localhost:7071/admin/functions/NightlyInvoiceSync \
 
 In Azure, the same endpoint needs the app's master key; the portal's **Test/Run** button does the same thing.
 
+## Deep dive: what a timer trigger does and doesn't guarantee
+
+Scheduled jobs fail in quiet ways: they run twice, they don't run at all, or they run at the wrong hour after a clock change. Knowing the timer trigger's guarantees lets you design for the gaps.
+
+### One run at a time, across all instances
+
+When a Function App runs on several instances, only **one** instance runs a given timer function at a time. The host coordinates this with a lock in the app's storage account (`AzureWebJobsStorage`). A new occurrence also won't start while the previous one is still running. You don't need your own "is the job already running?" flag for a single app.
+
+Two situations break that assumption:
+
+- **Two apps that share a storage account and host ID** share the lock, so only one of them runs its timers. Give every app its own storage account, as the Bicep template in this book does, or set distinct host IDs.
+- **The same job in two places** (a timer and a manual run from the portal, or an old app that was never switched off) isn't coordinated. The checkpoint design below still keeps the data correct, but you pay twice for the work.
+
+### Missed and late runs
+
+With **schedule monitoring** on (the default for schedules of a minute or longer), the host records each occurrence in storage. If the app was stopped or redeployed at 02:00, the host notices the missed occurrence when it starts and runs the function once, with `TimerInfo.IsPastDue` set to `true`. `NightlyInvoiceSync` logs a warning in that case (*Invoice sync is running late*) so a late run is visible on the operations workbook. Missed occurrences aren't replayed one by one: ten missed runs become one late run. That's exactly right for a watermark-based job, which catches up from its checkpoint whatever the time.
+
+### No retries
+
+A timer function that throws isn't retried. The next attempt is the next scheduled occurrence. `NightlyInvoiceSync` turns that into a feature: when any invoice fails, it **doesn't advance the watermark** and throws, so the run shows as failed in monitoring, and tomorrow's run repeats today's window. If a day's delay is too long, schedule the job more often; the work per run shrinks accordingly.
+
+### Time zones
+
+NCRONTAB expressions are evaluated in **UTC** unless the app is configured otherwise, and support for changing the time zone depends on the hosting plan and operating system. Harbourline keeps every schedule in UTC on purpose: UTC has no daylight-saving jumps, so `0 0 2 * * *` never runs twice or not at all on the night the clocks change. When the business asks for "2 a.m. UK time", agree on 02:00 UTC instead, or accept that the job moves by an hour in summer.
+
+### Reading NCRONTAB
+
+Functions uses six fields, with seconds first: `{second} {minute} {hour} {day} {month} {day-of-week}`.
+
+::: {#tbl:ncrontab caption="NCRONTAB examples"}
+| Expression | Runs |
+|---|---|
+| `0 0 2 * * *` | Every day at 02:00:00 |
+| `0 */5 * * * *` | Every five minutes, on the minute |
+| `30 */5 * * * *` | Every five minutes, 30 seconds past the minute (Chapter 21's pull) |
+| `0 0 6 * * 1-5` | 06:00 on weekdays |
+| `0 0 1 1 * *` | 01:00 on the first day of each month |
+| `0 15 2 * * 0` | 02:15 every Sunday |
+:::
+
+Keep schedules in app settings with the `%Name%` syntax (Step 4) when operations staff need to change them without a release, and in code when two schedules must stay aligned.
+
+### Why the watermark overlaps
+
+`InvoiceSyncJob` reads changes since the last watermark **minus five minutes**. Clocks in two systems are never perfectly aligned, and a record saved in LedgerOne just as the previous run started may carry a timestamp slightly before that run's start time. The overlap re-reads a few records each run; because the writes are upserts by alternate key, re-reading is harmless. Trading a little repeated work for never missing a change is the right deal for every watermark you build.
+
 ## Screens you will use
 
 ::: {.capture #fig:syncstate caption="Checkpoints are visible, and editable, in a model-driven view of hl_syncstate." app="Dynamics 365" path="Harbourline Admin app › Sync states" annotations="1 Job name; 2 Token (watermark); 3 Last run (UTC)"}
@@ -222,6 +268,71 @@ A timer could also start a Durable Functions orchestration that fans out the wor
 - Fail the invocation when rows fail, so monitoring sees it.
 - Never enable `RunOnStartup` in production.
 
+## Guided lab: run, break and recover the invoice sync
+
+**Requires:** the host and mocks from Chapter 3, the schema from Chapter 4 (including `hl_syncstate` and `hl_invoice`), and the identity from Chapter 5.
+
+### Lab 10.1 – The first run
+
+Delete any existing checkpoint so the job starts from the beginning. In the Harbourline Admin app, open **Sync states** and delete the row named `ledgerone-invoices` if it exists. Then run the job on demand:
+
+```bash
+curl -i -X POST http://localhost:7071/admin/functions/NightlyInvoiceSync \
+     -H "Content-Type: application/json" -d '{ "input": "" }'
+```
+
+**Expected log line** (illustrative):
+
+```text
+Invoice sync: 12 upserted, 0 failed, watermark 2026-10-27T09:41:07.5534120+00:00
+```
+
+**Checkpoint:** a `ledgerone-invoices` row now exists in **Sync states**, its token equal to the watermark in the log, and the invoices appear in Dynamics 365.
+
+### Lab 10.2 – Run it again
+
+Run the same command again immediately.
+
+**Checkpoint:** the log reports only the few invoices inside the five-minute overlap (often the same ones as before, or none), not the whole set. The upserts are idempotent: no duplicate invoices appear, because `hl_invoicenumber` is an alternate key.
+
+### Lab 10.3 – Make a run fail
+
+Restart the mocks with a high failure rate (Chapter 8):
+
+```bash
+dotnet run --project samples/Harbourline.Mocks -- --FailureRate=0.95
+```
+
+Note the current token in **Sync states**, then run the job.
+
+**Checkpoint:** the run fails (the host log shows the exception, and it counts as a failed invocation), and the token in **Sync states** is **unchanged**. A failed run never moves the watermark forward.
+
+### Lab 10.4 – Recover
+
+Restart the mocks with `--FailureRate=0` and run the job once more.
+
+**Checkpoint:** the run succeeds and the watermark moves forward. Nothing was lost: the failed window was simply read again. This is the whole recovery procedure for a watermark job, which is why runbooks for these jobs are short.
+
+### Lab 10.5 – Change the schedule without a release
+
+In `local.settings.json`, set `"InvoiceSyncSchedule": "0 */2 * * * *"` and restart the host.
+
+**Checkpoint:** the host log at start-up lists the next occurrences of the timer two minutes apart, and the job runs on its own. Set the value back to `0 0 2 * * *` afterwards. In Azure you'd change the app setting instead; the function picks the new schedule up when the app restarts.
+
+### Lab 10.6 – Write your own schedules
+
+Write NCRONTAB expressions for these requirements, then check them against @tbl:ncrontab:
+
+1. Every 15 minutes during the working day, 08:00–17:45, Monday to Friday.
+2. At 03:30 on the last day of… (careful: NCRONTAB has no "last day of month"; what would you do instead?)
+3. Every hour, at five past the hour.
+
+Suggested answers: `0 */15 8-17 * * 1-5`; schedule daily at 03:30 and check the date in code (`if (tomorrow.Day == 1)`); `0 5 * * * *`.
+
+### Lab 10.7 – Read Dataverse changes (optional)
+
+Step 5 reads Dataverse changes with change tracking for the opposite direction. Edit an account's phone number in Dynamics 365, then run `PushCustomersToLedgerOne` with the admin endpoint (replace the function name in the URL). **Checkpoint:** the log reports *Customer sync Dataverse → LedgerOne: 1 changed*, and the `accounts-to-ledgerone` checkpoint holds a new change-tracking token. Chapter 21 explains the complete two-way design.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -263,3 +374,5 @@ Answers are in Appendix G.
 - [Flex Consumption plan hosting](https://learn.microsoft.com/azure/azure-functions/flex-consumption-plan) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: timer trigger, NCRONTAB, singleton, incremental load, watermark, checkpoint, change tracking, data token -->
+
+<!-- expanded: deep dive + guided lab -->

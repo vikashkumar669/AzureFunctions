@@ -134,6 +134,59 @@ Power Automate makers can call Harbourline's APIs too, through a **custom connec
 
 Makers then see actions such as **Search properties** in the flow designer. The rules stay in the API; the maker decides when to call it.
 
+## Deep dive: what Dataverse sends, and what it doesn't promise
+
+A webhook looks simple: Dataverse posts JSON, your function answers 200. The details of that exchange decide whether your integration is reliable, so it's worth reading the contract closely.
+
+### The request
+
+Every webhook request is a `POST` whose body is the `RemoteExecutionContext` serialized as JSON, plus a few headers that let you route or reject a request before parsing the body.
+
+::: {#tbl:webhookheaders caption="Headers Dataverse adds to webhook requests"}
+| Header | Contains | Use it to |
+|---|---|---|
+| `x-ms-dynamics-organization` | Domain name of the sending environment | Log which environment called |
+| `x-ms-dynamics-entity-name` | Logical name of the table | Route or reject quickly |
+| `x-ms-dynamics-request-name` | The message (`Create`, `Update`, …) | Route or reject quickly |
+| `x-ms-correlation-request-id` | Correlation identifier used by the platform | Diagnose with Microsoft support |
+| `x-ms-dynamics-msg-size-exceeded` | Present only when the payload exceeded 256 KB | Detect a trimmed context |
+:::
+
+Headers are convenient, but don't use them for security decisions: anyone with the URL and key can set any header. The function in Step 2 checks the `OrganizationId` **inside** the body against configuration, and still relies on the key (or, better, a network restriction) to keep strangers out.
+
+### The body
+
+The fields you'll use most are `MessageName`, `PrimaryEntityName`, `PrimaryEntityId`, `OrganizationId`, `InitiatingUserId`, `CorrelationId`, `Depth`, and the collections `InputParameters`, `PreEntityImages` and `PostEntityImages`. Collections are serialized as arrays of `{ "key": …, "value": … }` pairs rather than JSON objects, and typed values carry their own shape: a choice is `{ "Value": 100000001 }`, a lookup is an object with `Id` and `LogicalName`. `DataverseEvent` in `src/Harbourline.Connect.Core/Events/DataverseEvent.cs` hides those shapes behind `GetChoice`, `GetString` and friends.
+
+### Large payloads lose their data
+
+When the whole payload exceeds 256 KB, Dataverse adds the `x-ms-dynamics-msg-size-exceeded` header and **removes** `ParentContext`, `InputParameters`, `PreEntityImages` and `PostEntityImages`. Your function then knows *that* a row changed, but not *what* changed. Two defences:
+
+- Keep images small: register the post-image with only the columns you need (Step 4), never "all columns".
+- When the collections are missing, read the row from Dataverse by `PrimaryEntityId` before acting. The parser in this chapter returns `null` values rather than throwing, so the function can choose to fall back.
+
+### Delivery: once, maybe twice, never guaranteed
+
+For an **asynchronous** step, the request is made by a system job. Dataverse waits up to **60 seconds** for a response. A 2xx response is success. A **502, 503 or 504** gets exactly one more attempt; any other failure, or a timeout, fails the system job. That has three consequences:
+
+1. **Answer fast.** Validate, enqueue, return. Anything slow belongs behind the queue (this chapter's function only writes one Service Bus message).
+2. **Expect duplicates.** One retry means your function may see the same event twice. The lease-signing workflow in Chapter 12 uses the lease number as the orchestration instance ID, so a duplicate can't start a second workflow.
+3. **Don't rely on retries for outages.** If your function is down for ten minutes, events in that window fail, and you must replay them from System Jobs or reconcile later. When losing events is unacceptable, post to Service Bus instead (Chapter 11), which stores messages until you're ready.
+
+::: {#tbl:webhookvsbus caption="Webhook or Service Bus endpoint?"}
+| Need | Webhook | Service Bus endpoint |
+|---|---|---|
+| Lowest latency, simplest set-up | ✓ | |
+| Survive a long outage of the receiver | | ✓ |
+| Synchronous step that can block the save | ✓ (keep it very fast) | |
+| Ordering and back-pressure | | ✓ (sessions, concurrency) |
+| Receiver outside Azure | ✓ | |
+:::
+
+### Synchronous webhooks
+
+A webhook can also be registered on a **synchronous** step. Then the user's save waits for your response, and a failure response cancels the operation with an error the user sees. That's powerful for validation against an external system, and dangerous for everything else: the user waits, and an outage in your function becomes an outage in Dynamics 365. Harbourline uses asynchronous steps for all webhooks in this book.
+
 ## Screens you will use
 
 ::: {.capture #fig:prt-webhook caption="Registering the webhook with WebhookKey authentication." app="Plug-in Registration Tool" path="Register › Register New Web Hook" annotations="1 Endpoint URL; 2 Authentication: WebhookKey; 3 Value: the function key"}
@@ -227,6 +280,86 @@ When Dataverse needs to *call a named operation* rather than react to a data cha
 - Turn on "Delete AsyncOperation if successful", and watch failed System Jobs.
 - Give makers APIs through custom connectors, not direct access to functions.
 
+## Guided lab: send Dataverse events by hand
+
+You can test every branch of the webhook function locally by posting the same JSON that Dataverse sends. **Requires:** the host running locally with `Dataverse__OrganizationId` set (Chapter 3). The final step also needs `ServiceBus__fullyQualifiedNamespace` pointing at your development namespace (Chapter 11).
+
+### Lab 9.1 – Save a sample event
+
+Create `lease-event.json` with your own organization ID (fictional values elsewhere):
+
+```json
+{
+  "MessageName": "Update",
+  "PrimaryEntityName": "hl_lease",
+  "PrimaryEntityId": "3c1f7a52-0000-4a1e-9c00-000000000042",
+  "OrganizationId": "<your-organization-id>",
+  "CorrelationId": "5d7e1c90-0000-4b3e-8f00-000000000001",
+  "OperationId": "6a2b3c4d-0000-4e5f-9a00-000000000002",
+  "InitiatingUserId": "7b3c4d5e-0000-4f60-8b00-000000000003",
+  "Depth": 1,
+  "InputParameters": [ { "key": "Target", "value": { "Attributes": [
+    { "key": "hl_leasestatus", "value": { "Value": 100000001 } } ] } } ],
+  "PostEntityImages": [ { "key": "PostImage", "value": { "Attributes": [
+    { "key": "hl_leasenumber", "value": "LSE-0042" } ] } } ]
+}
+```
+
+`100000001` is *Awaiting signature* in `LeaseStatus`.
+
+### Lab 9.2 – Not a Dataverse event
+
+```bash
+curl -i -X POST http://localhost:7071/api/webhooks/lease-status \
+     -H "Content-Type: application/json" -d '{"hello":"world"}'
+```
+
+**Checkpoint:** `400` with the title *Not a Dataverse event*. A malformed body is rejected before anything else happens.
+
+### Lab 9.3 – The wrong organization
+
+Copy the file to `other-org.json`, change any one hexadecimal digit of its `OrganizationId`, and post the copy:
+
+```bash
+curl -i -X POST http://localhost:7071/api/webhooks/lease-status \
+     -H "Content-Type: application/json" --data @other-org.json
+```
+
+**Checkpoint:** `403`, and the host log shows *Webhook from unexpected organization*. A key copied to another environment can't trigger Harbourline's production workflow.
+
+### Lab 9.4 – A change the function ignores
+
+Change the status value to `100000000` (*Draft*) and post again.
+
+**Checkpoint:** `200 OK` and no message queued. Returning 200 for events you don't care about matters: a non-2xx answer would fail the System Job and, for 502–504, cause a pointless retry.
+
+### Lab 9.5 – The event that matters
+
+Post the original file:
+
+```bash
+curl -i -X POST http://localhost:7071/api/webhooks/lease-status \
+     -H "Content-Type: application/json" --data @lease-event.json
+```
+
+**Checkpoint:** `200 OK`, a log line saying the lease was queued, and (with Service Bus configured) one message with body `LSE-0042` on the `lease-signing` queue. Peek it in the Service Bus Explorer in the Azure portal, or run the Durable workflow from Chapter 12, which consumes it.
+
+### Lab 9.6 – Measure your response time
+
+Dataverse waits at most 60 seconds, but you should aim for well under a second:
+
+```bash
+curl -s -o /dev/null -w "%{http_code} in %{time_total}s\n" -X POST \
+  http://localhost:7071/api/webhooks/lease-status \
+  -H "Content-Type: application/json" --data @lease-event.json
+```
+
+**Checkpoint:** a 200 in a fraction of a second after the first call. If you ever add work to this function, run this check again; anything that pushes the time towards seconds belongs behind the queue.
+
+### Lab 9.7 – End to end (optional)
+
+With the function deployed and the webhook and step registered (Steps 3 and 4), change a lease's status to *Awaiting signature* in Dynamics 365. Then open **Advanced Settings › System Jobs** and find the job for your step. **Checkpoint:** the job's status is *Succeeded* (or it has disappeared, if you chose to delete successful jobs in Step 4), and the function's invocation log shows one request.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -269,3 +402,5 @@ Answers are in Appendix G.
 - [Create a custom connector from an OpenAPI definition](https://learn.microsoft.com/connectors/custom-connectors/define-openapi-definition) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: event framework, step, webhook, RemoteExecutionContext, entity image, filtering attributes, System Jobs, custom connector, Custom API -->
+
+<!-- expanded: deep dive + guided lab -->

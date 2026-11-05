@@ -410,6 +410,13 @@ td code { font-size: 7.6pt; }
 .capture-box ul { list-style: none; padding-left: 0; margin: 2pt 0 4pt; }
 .capture-caption p { border-top: 0.5pt solid var(--rule); padding-top: 5pt; }
 
+/* Illustrative mock-ups ------------------------------------------- */
+.mockup { margin: 12pt 0; break-inside: avoid; }
+.mockup img { width: 100%; display: block; }
+.mockup-caption p { font: 400 8.5pt/1.45 var(--sans); color: var(--slate);
+  border-top: 0.5pt solid var(--rule); padding-top: 5pt; margin-top: 6pt; }
+.mockup-caption strong { color: var(--ink, #1B2433); }
+
 /* References ------------------------------------------------------- */
 #references + ul { font: 400 8.5pt/1.45 var(--sans); }
 

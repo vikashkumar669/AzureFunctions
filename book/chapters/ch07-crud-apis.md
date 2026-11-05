@@ -159,6 +159,47 @@ The token is opaque, not secret: it can be decoded. Never put anything in it tha
 
 The `v1` in every route is the API's major version. A change that would break existing callers, such as renaming a field or changing a status code, goes into a new `v2` route, while `v1` keeps working until its callers move. Adding a field or an optional parameter is not breaking and stays in `v1`. Chapter 14 publishes the versions through API Management, which can also route by header if you prefer URLs without versions.
 
+## Deep dive: which changes break callers?
+
+Once a partner or a portal calls your API, its contract is a promise. Step 8 versions the API in the URL, but a version number only helps if you know **when** a change needs one. The rule of thumb: a change is breaking if a correctly written client that worked yesterday can fail today.
+
+::: {#tbl:breaking caption="Common API changes and whether they break callers"}
+| Change | Breaking? | Why |
+|---|---|---|
+| Add an optional response field | No | Tolerant clients ignore fields they don't know |
+| Add an optional request field | No | Old clients don't send it; the server uses a default |
+| Add a new endpoint | No | Nobody calls it yet |
+| Rename or remove a response field | **Yes** | Clients reading it get nothing |
+| Change a field's type (`"2"` → `2`) | **Yes** | Deserialization fails or values change meaning |
+| Make an optional request field required | **Yes** | Old requests start failing validation |
+| Tighten validation (max length 100 → 60) | **Yes** | Previously valid requests are rejected |
+| Add a value to an enumeration such as `status` | Often | Strict clients may reject unknown values |
+| Change default paging size or sort order | Often | Clients that relied on the old behaviour see different data |
+| Change error status codes (404 → 400) | **Yes** | Client error handling branches on status |
+:::
+
+### Be a tolerant reader, and expect callers not to be
+
+Write your own clients (the LedgerOne client in Chapter 8, for example) to ignore unknown fields and to treat unknown enumeration values as "other". But assume the callers of **your** API are strict, because some will be: generated clients, low-code connectors and spreadsheets often fail on surprises. That asymmetry is why "Often" appears in the table: adding a status value is safe for careful clients and fatal for careless ones.
+
+### Expand, then contract
+
+When a breaking change is unavoidable, avoid a "big bang". Harbourline renames fields in three releases:
+
+1. **Expand.** Add the new field alongside the old one, and write both.
+2. **Migrate.** Tell callers, watch the logs or API Management analytics until nobody reads the old field.
+3. **Contract.** Remove the old field in the next major version (`/v2/`), keeping `/v1/` running for an announced period.
+
+The same pattern works inside Dataverse: add the new column, populate both, switch readers, and delete the old column last.
+
+### Document the contract where callers will find it
+
+Chapter 14 publishes an OpenAPI description through API Management (`infra/apim/partner-api.openapi.yaml`). Keep that file in the same repository as the code, review changes to it like code, and compare it with the previous version in pull requests: a removed property in the diff is a breaking change you can catch before release.
+
+### Idempotent and safe methods
+
+The HTTP methods carry promises too. `GET` must not change anything, so caches, retries and crawlers can call it freely. `PUT` and `DELETE` must be **idempotent**: doing them twice has the same effect as once. `POST` is neither, which is why Step 1's create endpoint answers a repeated create with `409 Conflict` instead of creating a duplicate, and why Chapter 8 adds idempotency keys for calls to other systems. `PATCH` is idempotent only when it sets values; this API's partial updates set absolute values (`monthlyRent: 1295`), never increments, so a retried PATCH is harmless.
+
 ## Screens you will use
 
 ::: {.capture #fig:http-file caption="Exercising the API from an .http file in VS Code or Visual Studio." app="VS Code" path="tests/requests/properties.http" annotations="1 GET list with filters; 2 PATCH with If-Match; 3 412 response with problem details"}
@@ -267,6 +308,116 @@ Keep page sizes moderate (50 by default, 200 at most): each page is one Datavers
 - Use one error shape, RFC 9457, for every failure.
 - Put a major version in the route from day one.
 
+## Guided lab: a complete CRUD session
+
+**Requires:** the host running locally (`func start`) with your development environment configured. The lab creates one property, `HBR-0900`; the last step removes it.
+
+Set a base URL once:
+
+```bash
+BASE=http://localhost:7071/api/v1
+```
+
+### Lab 7.1 – Create
+
+```bash
+curl -i -X POST $BASE/properties -H "Content-Type: application/json" -d '{
+  "code": "HBR-0900", "name": "Lab Cottage", "city": "Leeds",
+  "postcode": "LS2 7AA", "bedrooms": 2, "monthlyRent": 950 }'
+```
+
+**Checkpoint:** `201 Created`, a `Location` header pointing at `/api/v1/properties/HBR-0900`, an `ETag` header and the new property in the body.
+
+### Lab 7.2 – Create it again
+
+Repeat the same request. **Expected output** (illustrative):
+
+```text
+HTTP/1.1 409 Conflict
+Content-Type: application/problem+json
+
+{"title":"Conflict","status":409,"detail":"Property HBR-0900 already exists.",
+ "instance":"/api/v1/properties"}
+```
+
+**Checkpoint:** a retry of a create can't make a duplicate. The alternate key on `hl_propertycode` guarantees it even if two requests race.
+
+### Lab 7.3 – Send invalid data
+
+```bash
+curl -i -X POST $BASE/properties -H "Content-Type: application/json" -d '{
+  "code": "BAD", "name": "", "city": "Leeds", "postcode": "LS2 7AA",
+  "bedrooms": 40, "monthlyRent": 950 }'
+```
+
+**Expected output** (illustrative, abridged):
+
+```json
+{ "title": "The request is not valid.", "instance": "/api/v1/properties",
+  "errors": { "code": ["code must look like ABC-1234."],
+              "name": ["name is required."],
+              "bedrooms": ["bedrooms must be 0 to 20."] } }
+```
+
+**Checkpoint:** status 400, and **all** problems are reported at once, keyed by field. Nothing was sent to Dataverse.
+
+### Lab 7.4 – List, filter and page
+
+```bash
+curl -s "$BASE/properties?city=Leeds&minBedrooms=2&pageSize=2" | jq
+```
+
+**Checkpoint:** at most two items and a `continuationToken`. Copy the token and ask for the next page:
+
+```bash
+curl -s -G "$BASE/properties" --data-urlencode "city=Leeds" \
+  --data-urlencode "minBedrooms=2" --data-urlencode "pageSize=2" \
+  --data-urlencode "continuationToken=<token>" | jq '.items[].code'
+```
+
+Now change one character in the token and call again. **Checkpoint:** `400` with the title *Invalid continuation token*. The token is opaque to callers (Step 4), and a tampered token is rejected rather than misread.
+
+### Lab 7.5 – Update safely
+
+Read the property and keep its ETag:
+
+```bash
+ETAG=$(curl -s -D - -o /dev/null $BASE/properties/HBR-0900 \
+  | awk -F': ' 'tolower($1)=="etag"{print $2}' | tr -d '\r')
+echo $ETAG
+```
+
+Update with that ETag:
+
+```bash
+curl -i -X PATCH $BASE/properties/HBR-0900 -H "Content-Type: application/json" \
+  -H "If-Match: $ETAG" -d '{ "monthlyRent": 975 }'
+```
+
+**Checkpoint:** `200 OK` and a **new** ETag. Now send the same request again with the **old** ETag:
+
+**Expected output** (illustrative):
+
+```text
+HTTP/1.1 412 Precondition Failed
+
+{"title":"Precondition failed","status":412,
+ "detail":"The property was changed by someone else.", …}
+```
+
+That's optimistic concurrency at work: your second request was based on a version that no longer exists, so it was refused instead of silently overwriting the first change.
+
+### Lab 7.6 – Clean up
+
+The API has no delete endpoint by design (Chapter 5's role doesn't allow deletes). Remove `HBR-0900` in the maker portal or with your own token, as in Chapter 4:
+
+```bash
+curl -i -X DELETE "$ORG/api/data/v9.2/hl_properties(hl_propertycode='HBR-0900')" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Checkpoint:** `204 No Content`. Listing the properties again no longer shows the lab cottage.
+
 ## Hands-on exercise
 
 ::: exercise
@@ -308,3 +459,5 @@ Answers are in Appendix G.
 - [Web service error codes](https://learn.microsoft.com/power-apps/developer/data-platform/reference/web-service-error-codes) – Microsoft Learn, checked 2026-10-27.
 
 <!-- Glossary terms introduced in this chapter: resource, problem details, row version, ETag, optimistic concurrency, continuation token, API versioning -->
+
+<!-- expanded: deep dive + guided lab -->
