@@ -1,0 +1,67 @@
+<!--
+  Inbound policy for the Harbourline Partner API (Chapter 14).
+  Callers present a subscription key (which partner) and an Entra ID
+  token (proof of identity); APIM validates the token, applies a
+  per-subscription rate limit, and calls the Function App with its own
+  managed identity. Errors never leak backend details.
+-->
+<policies>
+  <inbound>
+    <base />
+    <!-- 1. Only tokens issued by our tenant, for this API, with the role. -->
+    <validate-azure-ad-token tenant-id="{{tenant-id}}"
+        header-name="Authorization" failed-validation-httpcode="401"
+        failed-validation-error-message="Unauthorized">
+      <audiences>
+        <audience>{{partner-api-audience}}</audience>
+      </audiences>
+      <required-claims>
+        <claim name="roles" match="any">
+          <value>Orders.Submit</value>
+          <value>Properties.Read</value>
+        </claim>
+      </required-claims>
+    </validate-azure-ad-token>
+
+    <!-- 2. 60 calls a minute per partner subscription. The subscription
+         key identifies the partner; the token proves who is calling. -->
+    <rate-limit calls="60" renewal-period="60" />
+
+    <!-- 3. Bodies above 256 KB are refused before they reach Azure Functions. -->
+    <choose>
+      <when condition="@(long.Parse(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;,&quot;0&quot;)) &gt; 262144)">
+        <return-response>
+          <set-status code="413" reason="Payload Too Large" />
+        </return-response>
+      </when>
+    </choose>
+
+    <!-- 4. Call the backend with APIM's managed identity. -->
+    <authentication-managed-identity resource="{{function-app-audience}}" />
+    <set-backend-service backend-id="harbourline-functions" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="X-Powered-By" exists-action="delete" />
+  </outbound>
+  <on-error>
+    <base />
+    <!-- 5. Problem details with a correlation id, never a stack trace. -->
+    <return-response>
+      <set-status code="@(context.Response?.StatusCode ?? 500)" />
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/problem+json</value>
+      </set-header>
+      <set-body>@{
+        return new JObject(
+          new JProperty("title", "The request could not be completed."),
+          new JProperty("status", context.Response?.StatusCode ?? 500),
+          new JProperty("traceId", context.RequestId.ToString())
+        ).ToString();
+      }</set-body>
+    </return-response>
+  </on-error>
+</policies>

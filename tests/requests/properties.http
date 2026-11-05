@@ -1,0 +1,31 @@
+# Property API requests (Chapter 7). Run with the REST Client extension
+# in VS Code or the .http editor in Visual Studio.
+@host = http://localhost:7071/api
+@code = HBR-0042
+
+### List available properties in Leeds, two or more bedrooms
+GET {{host}}/v1/properties?city=Leeds&status=Available&minBedrooms=2&pageSize=20
+
+### Read one property (note the ETag header)
+GET {{host}}/v1/properties/{{code}}
+
+### Create a property
+POST {{host}}/v1/properties
+Content-Type: application/json
+
+{
+  "code": "HBR-0099",
+  "name": "7 Dock Street",
+  "city": "Leeds",
+  "postcode": "LS10 1JF",
+  "bedrooms": 1,
+  "monthlyRent": 875,
+  "availableFrom": "2026-12-01"
+}
+
+### Change the rent, but only if nobody else has saved since our GET
+PATCH {{host}}/v1/properties/{{code}}
+Content-Type: application/json
+If-Match: "<etag-from-the-get>"
+
+{ "monthlyRent": 1195 }

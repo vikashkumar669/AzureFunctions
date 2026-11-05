@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 638 300" width="100%" role="img" aria-label="Events and apps flow into a function, which reads and writes Dataverse" style="display: block">
+<defs>
+<pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#1F3A60"></circle></pattern>
+<radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2B88D8" stop-opacity="0.45"></stop><stop offset="100%" stop-color="#2B88D8" stop-opacity="0"></stop></radialGradient>
+<linearGradient id="fn" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3A9BEA"></stop><stop offset="100%" stop-color="#0F5FA8"></stop></linearGradient>
+</defs>
+<rect x="0" y="0" width="100%" fill="url(#dots)"></rect>
+<circle cx="319" cy="150" r="130" fill="url(#glow)"></circle>
+<g fill="none" stroke-width="2.5" stroke-linecap="round">
+<path d="M112 80 C 180 80, 195 128, 253 128" stroke="#2B88D8"></path>
+<path d="M98 220 C 180 220, 195 172, 253 172" stroke="#2B88D8"></path>
+<path d="M385 140 L 506 140" stroke="#2B88D8"></path>
+<path d="M506 168 L 385 168" stroke="#8CC8FF" stroke-dasharray="6 7"></path>
+</g>
+<circle cx="182" cy="96" r="5" fill="#FFFFFF"></circle>
+<circle cx="186" cy="204" r="5" fill="#FFFFFF"></circle>
+<circle cx="446" cy="140" r="5" fill="#FFFFFF"></circle>
+<g>
+<circle cx="70" cy="80" r="40" fill="#0E2747" stroke="#8CC8FF" stroke-width="2"></circle>
+<circle cx="70" cy="80" r="22" fill="none" stroke="#8CC8FF" stroke-width="2" opacity="0.6"></circle>
+<circle cx="70" cy="80" r="7" fill="#8CC8FF"></circle>
+<text x="70" y="146" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#C9D6E8">Events</text>
+</g>
+<g>
+<rect x="44" y="176" width="54" height="90" rx="12" fill="#0E2747" stroke="#8CC8FF" stroke-width="2"></rect>
+<rect x="54" y="190" width="34" height="8" rx="3" fill="#8CC8FF"></rect>
+<rect x="54" y="206" width="34" height="20" rx="4" fill="#1F3A60"></rect>
+<rect x="54" y="232" width="20" height="8" rx="3" fill="#1F3A60"></rect>
+<text x="71" y="290" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#C9D6E8">Apps &amp; flows</text>
+</g>
+<g>
+<rect x="253" y="84" width="132" height="132" rx="30" fill="url(#fn)"></rect>
+<text x="319" y="166" text-anchor="middle" font-family="'Cascadia Code', monospace" font-size="46" font-weight="500" fill="#FFFFFF">ƒ(x)</text>
+<text x="319" y="244" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#C9D6E8">Functions</text>
+</g>
+<g fill="#0E2747" stroke="#8CC8FF" stroke-width="2">
+<path d="M508 98 L508 202 A52 16 0 0 0 612 202 L612 98"></path>
+<ellipse cx="560" cy="98" rx="52" ry="16"></ellipse>
+<path d="M508 134 A52 16 0 0 0 612 134" fill="none" opacity="0.6"></path>
+<path d="M508 168 A52 16 0 0 0 612 168" fill="none" opacity="0.6"></path>
+</g>
+<text x="560" y="244" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="14" font-weight="600" fill="#C9D6E8">Dataverse</text>
+</svg>

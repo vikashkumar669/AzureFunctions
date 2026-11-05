@@ -1,0 +1,61 @@
+/* Front matter: cover, title page, copyright, contents, preface. */
+@page cover { margin: 0; background: #0A1B33;
+  @top-left { content: none; } @top-right { content: none; }
+  @bottom-left { content: none; } @bottom-right { content: none; } }
+@page front {
+  @top-left { content: none; } @top-right { content: none; }
+  @bottom-left { content: none; } @bottom-right { content: none; } }
+
+.cover { page: cover; height: 9.25in; box-sizing: border-box;
+  padding: 0.55in 0.55in 0.5in; background: #0A1B33; color: #F4F8FC;
+  font-family: var(--sans); display: flex; flex-direction: column;
+  break-after: page; }
+.cover-top { display: flex; justify-content: space-between; align-items: center; }
+.cover-kicker { margin: 0; font: 700 9.5pt var(--sans); letter-spacing: 2.2pt;
+  text-transform: uppercase; color: #8CC8FF; }
+.cover-pill { margin: 0; font: 600 8.5pt var(--sans); color: #C9D6E8;
+  padding: 4pt 9pt; border: 0.75pt solid #2A4468; border-radius: 99pt; }
+.cover-accent { width: 46pt; height: 3pt; background: #2B88D8; margin: 16pt 0;
+  border-radius: 2pt; }
+.cover-title { margin: 0; font: 800 54pt/1.0 var(--sans); letter-spacing: -1.5pt;
+  color: #FFFFFF; string-set: none; }
+.cover-sub { margin: 12pt 0 0; font: 600 27pt/1.15 var(--sans); color: #8CC8FF; }
+.cover-desc { margin: 14pt 0 0; font: 400 13pt/1.5 var(--sans); color: #C9D6E8;
+  width: 4.6in; }
+.cover-art { margin: 22pt 0 0; }
+.cover-foot { margin-top: auto; border-top: 0.75pt solid #2A4468; padding-top: 12pt; }
+.cover-tag { margin: 0 0 10pt; font: 500 11.5pt var(--sans); color: #C9D6E8; }
+.cover-row { display: flex; justify-content: space-between; align-items: flex-end; }
+.cover-author { margin: 0; font: 700 16pt var(--sans); color: #FFFFFF; }
+.cover-count { margin: 0; font: 600 9pt var(--sans); letter-spacing: 1.4pt;
+  text-transform: uppercase; color: #9FB3CC; }
+
+.titlepage { page: front; break-before: right; break-after: page;
+  padding-top: 2in; }
+.tp-title { font: 800 26pt/1.15 var(--sans); color: var(--navy); margin: 0 0 12pt; }
+.tp-sub { font: 400 14pt/1.4 var(--sans); color: var(--azure); margin: 0 0 8pt; }
+.tp-tag { font: italic 400 11pt var(--serif); color: var(--slate); margin: 0 0 1.5in; }
+.tp-author { font: 700 16pt var(--sans); color: var(--navy); }
+
+.copyright { page: front; break-after: page; font-size: 8.5pt; line-height: 1.45; }
+.copyright p { margin: 0 0 7pt; }
+.copyright p.versions { font: 400 7pt/1.4 var(--sans); color: var(--slate); }
+.copyright table.versions td, .copyright table.versions th { padding: 1.5pt 4pt; }
+
+.toc { break-before: page; break-after: page; }
+.toc-head { font: 800 24pt var(--sans); color: var(--navy); margin: 0 0 14pt;
+  border: none; string-set: chaptitle "Contents"; }
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-list li { margin: 0; padding: 2.2pt 0; font: 400 9.6pt var(--sans); }
+.toc-list li.toc-part { font: 700 7.6pt var(--sans); letter-spacing: 1.2pt;
+  text-transform: uppercase; color: var(--azure); padding-top: 9pt; }
+.toc-list a { color: var(--ink); display: block; }
+.toc-list a::after { content: leader(".") target-counter(attr(href), page);
+  color: var(--slate); }
+.toc-n { display: inline-block; width: 0.35in; font-weight: 700; color: var(--navy); }
+
+.preface { break-before: page; string-set: chaptitle "Preface"; }
+.preface h2 { font: 800 24pt var(--sans); color: var(--navy); border: none;
+  margin: 0 0 14pt; }
+.preface h3 { font: 700 12pt var(--sans); color: var(--azure); margin: 14pt 0 5pt; }
+.preface blockquote { margin: 6pt 0 8pt 14pt; font-family: var(--sans); }

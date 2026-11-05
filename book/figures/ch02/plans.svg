@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 430" width="640" height="430" font-family="Inter, Arial, sans-serif" role="img" aria-label="Three questions decide between Container Apps, Dedicated, Premium and the default Flex Consumption plan">
+  <title>Choosing a hosting plan</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#4A5568"/>
+    </marker>
+  </defs>
+
+  <g fill="#0B1F3A">
+    <rect x="10" y="10" width="370" height="62" rx="31" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="34" y="37" font-size="12.5" font-weight="600">1  Must it run as a container?</text>
+    <text x="34" y="56" font-size="11" fill="#4A5568">beside microservices, custom Linux image</text>
+
+    <rect x="10" y="112" width="370" height="62" rx="31" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="34" y="139" font-size="12.5" font-weight="600">2  Is there spare App Service capacity?</text>
+    <text x="34" y="158" font-size="11" fill="#4A5568">an existing plan you already pay for</text>
+
+    <rect x="10" y="214" width="370" height="62" rx="31" fill="#FFFFFF" stroke="#0B1F3A" stroke-width="1.2"/>
+    <text x="34" y="241" font-size="12.5" font-weight="600">3  Windows, slots or near-constant load?</text>
+    <text x="34" y="260" font-size="11" fill="#4A5568">Windows-only code, deployment slots, busy 24/7</text>
+  </g>
+
+  <g fill="none" stroke="#4A5568" stroke-width="1.5">
+    <path d="M380 41H426" marker-end="url(#a)"/>
+    <path d="M380 143H426" marker-end="url(#a)"/>
+    <path d="M380 245H426" marker-end="url(#a)"/>
+    <path d="M195 72V108" marker-end="url(#a)"/>
+    <path d="M195 174V210" marker-end="url(#a)"/>
+    <path d="M195 276V312" marker-end="url(#a)"/>
+  </g>
+  <g font-size="11" fill="#4A5568">
+    <text x="403" y="34" text-anchor="middle">yes</text>
+    <text x="403" y="136" text-anchor="middle">yes</text>
+    <text x="403" y="238" text-anchor="middle">yes</text>
+    <text x="205" y="95">no</text>
+    <text x="205" y="197">no</text>
+    <text x="205" y="299">no</text>
+  </g>
+
+  <g fill="#0B1F3A">
+    <rect x="430" y="14" width="200" height="54" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="444" y="37" font-size="12.5" font-weight="600">Azure Container Apps</text>
+    <text x="444" y="55" font-size="11" fill="#4A5568">KEDA-based scaling</text>
+
+    <rect x="430" y="116" width="200" height="54" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="444" y="139" font-size="12.5" font-weight="600">Dedicated plan</text>
+    <text x="444" y="157" font-size="11" fill="#4A5568">enable Always On</text>
+
+    <rect x="430" y="218" width="200" height="54" rx="6" fill="#E8F2FB" stroke="#0F6CBD"/>
+    <text x="444" y="241" font-size="12.5" font-weight="600">Premium plan</text>
+    <text x="444" y="259" font-size="11" fill="#4A5568">at least one warm instance</text>
+  </g>
+
+  <rect x="10" y="316" width="620" height="100" rx="8" fill="#0B1F3A"/>
+  <text x="30" y="346" font-size="14" font-weight="700" fill="#FFFFFF">Flex Consumption · the default for new apps</text>
+  <text x="30" y="368" font-size="11.5" fill="#C9D6E8">scales to zero, per-function scaling, virtual network, always-ready option</text>
+  <text x="30" y="386" font-size="11.5" fill="#C9D6E8">Linux only, one app per plan, no deployment slots</text>
+  <text x="30" y="404" font-size="11.5" font-weight="600" fill="#9CCBFA">Harbourline Connect uses this plan</text>
+</svg>

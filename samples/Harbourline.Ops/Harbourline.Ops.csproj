@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Operator tools (Chapters 16 and 24):
+      migrate   <legacy.csv> <run-name>   restartable property migration
+      reconcile <legacy.csv>              compare source with Dataverse
+      dlq-peek  <namespace> <queue>        list dead-lettered messages
+      dlq-replay <namespace> <queue> [reason]  resend dead letters
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Harbourline.Ops</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.21.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Harbourline.Connect.Core\Harbourline.Connect.Core.csproj" />
+  </ItemGroup>
+</Project>

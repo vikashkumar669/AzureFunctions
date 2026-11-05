@@ -1,0 +1,59 @@
+// Harbourline Connect – Application Insights queries (Chapter 18).
+// Run in Application Insights › Logs. Tables are the classic names;
+// in the Log Analytics workspace they are AppRequests, AppTraces, ...
+
+// <listing:kql-health>
+// 1. Invocations and failures per function, last 24 hours
+requests
+| where timestamp > ago(24h)
+| summarize total = count(),
+            failed = countif(success == false),
+            p95_ms = percentile(duration, 95)
+    by name
+| extend failure_rate = round(100.0 * failed / total, 1)
+| order by failed desc
+// </listing:kql-health>
+
+// <listing:kql-trace>
+// 2. Everything that happened in one operation, in order
+let op = "<operation-id>";
+union requests, dependencies, traces, exceptions
+| where operation_Id == op
+| project timestamp, itemType, name, message, type,
+          target, resultCode, duration, customDimensions
+| order by timestamp asc
+// </listing:kql-trace>
+
+// <listing:kql-dataverse>
+// 3. Calls to Dataverse: volume, failures and latency per 5 minutes
+dependencies
+| where timestamp > ago(6h)
+| where target has "dynamics.com"
+| summarize calls = count(),
+            failed = countif(success == false),
+            p95_ms = percentile(duration, 95)
+    by bin(timestamp, 5m)
+| render timechart
+// </listing:kql-dataverse>
+
+// <listing:kql-invocation>
+// 4. All logs written during one invocation (scope from middleware)
+traces
+| where customDimensions.InvocationId == "<invocation-id>"
+| project timestamp, severityLevel, message
+| order by timestamp asc
+// </listing:kql-invocation>
+
+// 5. Bulk load throughput, one row per run
+traces
+| where message startswith "Bulk load"
+| project timestamp, message
+| order by timestamp desc
+
+// <listing:kql-deadletter>
+// 6. Messages dead-lettered by the app, per queue, per hour
+customMetrics
+| where name == "harbourline.messages.deadlettered"
+| extend queue = tostring(customDimensions.queue)
+| summarize dead_lettered = sum(valueSum) by queue, bin(timestamp, 1h)
+// </listing:kql-deadletter>

@@ -1,0 +1,108 @@
+openapi: 3.0.3
+info:
+  title: Harbourline Partner API
+  version: "1.0"
+  description: >
+    Fictional API from the book "Azure Functions for Dynamics 365
+    & Power Platform". Maintenance partners submit service orders and read
+    available properties.
+servers:
+  - url: https://example.invalid/partner
+paths:
+  /v1/orders:
+    post:
+      operationId: SubmitOrder
+      summary: Submit a service order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderSubmission' }
+      responses:
+        "202":
+          description: Accepted for processing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderAccepted' }
+        "400": { $ref: '#/components/responses/Problem' }
+        "401": { description: Missing or invalid token }
+        "429": { description: Rate limit exceeded }
+  /v1/orders/{number}:
+    get:
+      operationId: GetOrderStatus
+      summary: Read an order's status
+      parameters:
+        - { name: number, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The order's status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderStatus' }
+        "404": { $ref: '#/components/responses/Problem' }
+  /v1/search/properties:
+    get:
+      operationId: SearchProperties
+      summary: Search available properties
+      parameters:
+        - { name: city, in: query, schema: { type: string } }
+        - { name: minBedrooms, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: after, in: query, schema: { type: string } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: One page of properties
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PropertyPage' }
+components:
+  responses:
+    Problem:
+      description: RFC 9457 problem details
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    OrderSubmission:
+      type: object
+      required: [orderNumber, propertyCode, category, amount, partnerId]
+      properties:
+        orderNumber: { type: string, maxLength: 20 }
+        propertyCode: { type: string, pattern: '^[A-Z]{3}-[0-9]{4}$' }
+        category: { type: string, enum: [Plumbing, Electrical, Heating, Cleaning, General] }
+        amount: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 50000 }
+        partnerId: { type: string, maxLength: 40 }
+    OrderAccepted:
+      type: object
+      properties:
+        orderNumber: { type: string }
+        statusUrl: { type: string }
+    OrderStatus:
+      type: object
+      properties:
+        orderNumber: { type: string }
+        status: { type: string, enum: [Received, Approved, Rejected] }
+    Property:
+      type: object
+      properties:
+        code: { type: string }
+        name: { type: string }
+        city: { type: string }
+        postcode: { type: string }
+        bedrooms: { type: integer }
+        monthlyRent: { type: number }
+        status: { type: string }
+        availableFrom: { type: string, format: date, nullable: true }
+    PropertyPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Property' } }
+        continuationToken: { type: string, nullable: true }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
