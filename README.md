@@ -4,6 +4,10 @@ Companion repository for the book **Azure Functions for Dynamics 365 & Power Pla
 
 > **Fictional scenario.** Harbourline Group, Harbourline Connect, LedgerOne and SignBridge are fictional names invented for this book. Any resemblance to real companies, products or people is coincidental. No real customer data or credentials are included anywhere in this repository.
 
+## Documentation
+
+See [`docs/`](docs/README.md) for the quick start, how the app connects to Dynamics 365, a list of every function, and a chapter-to-code map.
+
 ## Technology baseline
 
 | Item | Version |
@@ -30,6 +34,7 @@ AzureFunctions/
   samples/                           Setup tool, probe, partner mocks, ops tool, trigger gallery
   infra/                             Bicep templates, API Management policy and KQL queries
   pipelines/                         Azure DevOps pipeline (alternative to GitHub Actions)
+  docs/                              Quick start, D365 connection guide, function list, chapter map
 ```
 
 ## Run locally
