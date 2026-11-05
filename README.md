@@ -27,11 +27,10 @@ AzureFunctions/
     Harbourline.Connect.Contracts/   Request/response DTOs shared with API callers
   tests/
     Harbourline.Connect.UnitTests/   xUnit + NSubstitute
+  samples/                           Setup tool, probe, partner mocks, ops tool, trigger gallery
+  infra/                             Bicep templates, API Management policy and KQL queries
   pipelines/                         Azure DevOps pipeline (alternative to GitHub Actions)
-  book/                              Manuscript sources, screen mock-ups and the capture plan
 ```
-
-Projects are added chapter by chapter; each chapter's finished state is tagged `ch-NN`.
 
 ## Run locally
 
@@ -46,11 +45,11 @@ Projects are added chapter by chapter; each chapter's finished state is tagged `
 
 ```bash
 dotnet build HarbourlineConnect.slnx -c Release
-dotnet test HarbourlineConnect.slnx -c Release
+dotnet test --solution HarbourlineConnect.slnx -c Release
 ```
 
 GitHub Actions runs the same steps on every push that touches this folder (`.github/workflows/azure-functions-book.yml` at the repository root).
 
 ## Licence
 
-Code: MIT (see `LICENSE`). Book text and figures: © Vikash Kumar. All rights reserved.
+The code in this repository is MIT-licensed (see `LICENSE`). It is the companion code for the book *Azure Functions for Dynamics 365 & Power Platform* by Vikash Kumar; the book itself is not part of this repository, and its text and figures are © Vikash Kumar, all rights reserved.
