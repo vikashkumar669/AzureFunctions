@@ -1,6 +1,6 @@
 # Azure Functions for Dynamics 365 & Power Platform — companion code
 
-This wiki accompanies the book **Azure Functions for Dynamics 365 & Power Platform: A Practical Guide to Integration, Automation, APIs, and Enterprise Solutions** by Vikash Kumar.
+These docs accompany the book **Azure Functions for Dynamics 365 & Power Platform: A Practical Guide to Integration, Automation, APIs, and Enterprise Solutions** by Vikash Kumar.
 
 The repository contains the working code for every example in the book: a .NET 10 isolated-worker Function App that integrates with Dataverse (Dynamics 365), plus sample tools, infrastructure templates, pipelines and unit tests.
 
@@ -8,7 +8,7 @@ The repository contains the working code for every example in the book: a .NET 1
 
 ## Pages
 
-- **[Azure Function and connecting to D365](connecting-to-d365.md)** — how the Function App connects to Dataverse, every function in the app, and a chapter-by-chapter map to the code.
+- **[Azure Function and connecting to D365](connecting-to-d365.md)** ([wiki](https://github.com/vikashkumar669/AzureFunctions/wiki/Azure-Function-and-connecting-to-D365)) — how the Function App connects to Dataverse, every function in the app, and a chapter-by-chapter map to the code.
 
 ## Quick start
 
