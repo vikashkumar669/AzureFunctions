@@ -9,6 +9,7 @@ using Microsoft.Xrm.Sdk.Query;
 using static Harbourline.Setup.SchemaBuilder;
 
 // Creates the Harbourline solution, tables, columns, keys and lookups
+// (and, with --sample-data, fictional rows for the guided labs)
 // in a DEVELOPER environment, signed in with your own account
 // (az login). Never point it at production.
 
@@ -157,6 +158,12 @@ await schema.EnsureKeyAsync(
     "hl_meterreading", "hl_readingkey_key", "hl_readingkey");
 await schema.EnsureKeyAsync("hl_syncstate", "hl_name_key", "hl_name");
 await schema.EnsureKeyAsync("account", "hl_accountnumber_key", "accountnumber");
+
+if (args.Contains("--sample-data"))
+{
+    // Fictional rows for the guided labs (keys must be active first).
+    await SampleData.SeedAsync(client);
+}
 
 Console.WriteLine("Done. Publish customizations in the maker portal.");
 
