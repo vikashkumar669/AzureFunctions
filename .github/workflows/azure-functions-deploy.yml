@@ -1,0 +1,82 @@
+# Deploys Harbourline Connect: Dev on every push to main, then Test and
+# Prod after approval (Chapter 20). Uses OpenID Connect: there is no
+# Azure secret in GitHub, only the IDs of a federated identity.
+name: azure-functions-deploy
+
+# Manual until the GitHub environments and variables in Chapter 20 are
+# set up; then add:  push: { branches: [main] }
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write        # lets the job request an OIDC token
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: 'global.json'
+      - name: Test
+        run: dotnet test --solution HarbourlineConnect.slnx -c Release
+      - name: Publish
+        run: >
+          dotnet publish src/Harbourline.Connect.Functions
+          -c Release -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: functions
+          path: 'publish'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      max-parallel: 1                  # dev, then test, then prod
+      matrix:
+        environment: [dev, test, prod]
+    environment: ${{ matrix.environment }}   # approvals live here
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: functions
+          path: 'publish'
+
+      - name: Sign in to Azure (OIDC)
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Infrastructure
+        id: infra
+        run: |
+          az deployment group create \
+            --resource-group "${{ vars.RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters environmentName=${{ matrix.environment }} \
+                         dataverseUrl="${{ vars.DATAVERSE_URL }}" \
+            --query properties.outputs.functionAppName.value -o tsv \
+            > app-name.txt
+          echo "app=$(cat app-name.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy code
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.infra.outputs.app }}
+          package: 'publish'
+
+      - name: Smoke test
+        run: |
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://${{ steps.infra.outputs.app }}.azurewebsites.net/api/health")
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::Health check did not return 200"; exit 1

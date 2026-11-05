@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Harbourline.Connect.Contracts/Harbourline.Connect.Contracts.csproj" />
+    <Project Path="src/Harbourline.Connect.Core/Harbourline.Connect.Core.csproj" />
+    <Project Path="src/Harbourline.Connect.Functions/Harbourline.Connect.Functions.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Harbourline.Samples.Triggers/Harbourline.Samples.Triggers.csproj" />
+    <Project Path="samples/Harbourline.Setup/Harbourline.Setup.csproj" />
+    <Project Path="samples/Harbourline.Probe/Harbourline.Probe.csproj" />
+    <Project Path="samples/Harbourline.Mocks/Harbourline.Mocks.csproj" />
+    <Project Path="samples/Harbourline.Ops/Harbourline.Ops.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Harbourline.Connect.UnitTests/Harbourline.Connect.UnitTests.csproj" />
+  </Folder>
+</Solution>
