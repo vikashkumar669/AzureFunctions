@@ -1,6 +1,6 @@
 # Azure Functions for Dynamics 365 & Power Platform — companion code
 
-Companion repository for the book **Azure Functions for Dynamics 365 & Power Platform: A Practical Guide to Integration, Automation, APIs, and Enterprise Solutions** by Vikash Kumar (self-published).
+Companion repository for the book **Azure Functions for Dynamics 365 & Power Platform: A Practical Guide to Integration, Automation, APIs, and Enterprise Solutions**.
 
 > **Fictional scenario.** Harbourline Group, Harbourline Connect, LedgerOne and SignBridge are fictional names invented for this book. Any resemblance to real companies, products or people is coincidental. No real customer data or credentials are included anywhere in this repository.
 
